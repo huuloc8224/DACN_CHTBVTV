@@ -1,12 +1,16 @@
-// frontend/src/pages/AdminDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
     PlusCircle, Database, LayoutDashboard, Package, Users, Truck, 
-    Eye, X, Trash2, Image, Tag, Loader, Edit2, XCircle as CloseCircle,
-    BarChart2, DollarSign, ListOrdered, UserCheck // [MỚI] Thêm icon Thống kê
+    Eye, X, Trash2, Image, Tag, Loader, Edit2, XCircle as CloseCircle, 
+    BarChart2, DollarSign, ListOrdered, UserCheck 
 } from 'lucide-react';
+import { 
+    ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
+    PieChart, Pie, Cell, Tooltip as PieTooltip 
+} from 'recharts';
 import api from '../services/api';
+import { Link } from 'react-router-dom'; 
 
 const STATUS_OPTIONS = ['Pending', 'Shipped', 'Delivered', 'Cancelled'];
 const CATEGORY_OPTIONS = [
@@ -15,14 +19,43 @@ const CATEGORY_OPTIONS = [
     { value: 'thucan', label: 'Thức Ăn Gia Súc/Gia Cầm' }
 ];
 
+// [SỬA LỖI] THÊM KHAI BÁO MÀNG MÀU CHO BIỂU ĐỒ
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
 const getCategoryDisplayName = (code) => {
     switch (code) {
         case 'thuoc': return 'Thuốc BVTV';
         case 'phan': return 'Phân Bón';
         case 'thucan': return 'Thức Ăn Gia Súc/Gia Cầm';
-        default: return code;
+        default: return code || 'Khác';
     }
 };
+
+// [MỚI] HÀM TÙY CHỈNH NHÃN CHO BIỂU ĐỒ TRÒN (HIỂN THỊ %)
+const RADIAN = Math.PI / 180;
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+    // Tính toán vị trí hiển thị nhãn (ở giữa miếng bánh)
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    // Chỉ hiển thị % nếu nó lớn hơn 5% (tránh rối mắt)
+    if ((percent * 100) < 5) return null;
+
+    return (
+        <text 
+            x={x} 
+            y={y} 
+            fill="white" 
+            textAnchor="middle" 
+            dominantBaseline="central"
+            className="font-bold"
+        >
+            {`${(percent * 100).toFixed(0)}%`}
+        </text>
+    );
+};
+
 
 // --- Component Modal Chi tiết Đơn hàng ---
 const OrderDetailsModal = ({ order, onClose }) => {
@@ -77,6 +110,70 @@ const OrderDetailsModal = ({ order, onClose }) => {
 };
 
 
+// --- [MỚI] Component Modal Lịch sử Đơn hàng của User ---
+const UserOrdersModal = ({ userId, userName, onClose }) => {
+    const [userOrders, setUserOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+
+    useEffect(() => {
+        const fetchUserOrders = async () => {
+            try {
+                const res = await api.get(`/orders/user/${userId}`);
+                setUserOrders(res.data);
+            } catch (error) {
+                console.error("Lỗi tải đơn hàng của user:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchUserOrders();
+    }, [userId]);
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 className="text-2xl font-bold text-gray-800">Lịch sử Đơn hàng của: {userName}</h2>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={24} /></button>
+                </div>
+
+                {loading ? (
+                    <div className="text-center py-10"><Loader size={24} className="animate-spin"/></div>
+                ) : (
+                    <table className="min-w-full text-sm">
+                        <thead className="bg-gray-100 border-b">
+                            <tr>
+                                <th className="py-2 px-4 text-left">ID ĐH</th><th className="py-2 px-4 text-left">Ngày</th><th className="py-2 px-4 text-left">Tổng tiền</th><th className="py-2 px-4 text-left">Trạng thái</th><th className="py-2 px-4 text-left">Chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {userOrders.map(o => (
+                                <tr key={o._id} className="border-b hover:bg-gray-50">
+                                    <td className="py-2 px-4">{o._id.substring(0, 8)}...</td>
+                                    <td className="py-2 px-4">{new Date(o.orderDate).toLocaleDateString()}</td>
+                                    <td className="py-2 px-4 font-semibold">{o.totalAmount.toLocaleString('vi-VN')}₫</td>
+                                    <td className="py-2 px-4">{o.status}</td>
+                                    <td className="py-2 px-4">
+                                        <button onClick={() => setSelectedOrder(o)} className="text-blue-600 hover:text-blue-800">
+                                            <Eye size={18}/>
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+            
+            {/* Modal lồng: Hiển thị chi tiết 1 đơn hàng */}
+            {selectedOrder && (
+                <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+            )}
+        </div>
+    );
+};
+
 // --- Component Chính: AdminDashboard ---
 const AdminDashboard = () => {
     const { user } = useAuth();
@@ -86,29 +183,36 @@ const AdminDashboard = () => {
     const [orders, setOrders] = useState([]);
     const [users, setUsers] = useState([]);
     const [stats, setStats] = useState(null); // [MỚI] State cho dữ liệu thống kê
+
+    // [SỬA LỖI] THÊM 2 DÒNG KHAI BÁO STATE CÒN THIẾU
+    const [isUserOrdersModalOpen, setIsUserOrdersModalOpen] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
+
+    const [topCustomers, setTopCustomers] = useState([]); // [MỚI] State Top Khách hàng
+    const [minSpend, setMinSpend] = useState(0); // [MỚI] State cho ngưỡng chi tiêu
+
     const [loadingData, setLoadingData] = useState(false);
 
     // States cho Modal chi tiết
-const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null); 
     
     // [MỚI] State để quản lý chế độ Sửa
-    const [isEditing, setIsEditing] = useState(false);
-    const [currentProductId, setCurrentProductId] = useState(null);
-
-    // State cho việc thêm/sửa sản phẩm (imageFile sẽ lưu Base64)
-    const [newProduct, setNewProduct] = useState({
+   const [newProduct, setNewProduct] = useState({
         name: '', description: '', price: '', active_ingredient: '', stock_quantity: '', 
         imageFile: null, category: 'thuoc'
     });
     const [previewImage, setPreviewImage] = useState(''); 
+    const placeholderImg = "http://localhost:3001/images/placeholder.jpg"; 
     
-    const placeholderImg = "http://localhost:3001/images/placeholder.jpg";
+    const [isEditing, setIsEditing] = useState(false);
+    const [currentProductId, setCurrentProductId] = useState(null);
 
-    // --- Data Fetching ---
-// [SỬA LẠI] fetchData để lấy cả Thống kê
+    // [SỬA LẠI] fetchData để lấy cả Thống kê
+    // [SỬA LẠI] fetchData để lấy cả Thống kê
     const fetchData = async (tab) => {
         setLoadingData(true);
+        setStatusMessage({ type: '', message: '' });
         try {
             if (tab === 'products') {
                 const res = await api.get('/products');
@@ -121,8 +225,11 @@ const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
                 setUsers(res.data);
             } else if (tab === 'stats') {
                 // [MỚI] Gọi API thống kê
-                const res = await api.get('/orders/stats');
-                setStats(res.data);
+                const resSales = await api.get('/orders/stats/sales');
+                setStats(resSales.data);
+                // [MỚI] Gọi API Top Customers
+                const resCustomers = await api.get('/orders/stats/top-customers', { params: { minSpend } });
+                setTopCustomers(resCustomers.data);
             }
         } catch (error) {
             console.error(`Error fetching ${tab}:`, error);
@@ -136,7 +243,23 @@ const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
         if (user && user.role === 'admin') {
             fetchData(activeTab);
         }
-    }, [activeTab, user]);
+    }, [activeTab, user]); 
+
+    // [MỚI] Hàm fetch Top Customers khi đổi ngưỡng chi tiêu
+    const handleFetchTopCustomers = () => {
+        // Chỉ fetch lại top customers, không fetch lại sales
+        setLoadingData(true);
+        api.get('/orders/stats/top-customers', { params: { minSpend } })
+            .then(res => setTopCustomers(res.data))
+            .catch(err => setStatusMessage({ type: 'error', message: 'Lỗi tải top khách hàng.' }))
+            .finally(() => setLoadingData(false));
+    };
+    
+    // [MỚI] Hàm mở modal xem đơn hàng của user
+    const openUserOrders = (customer) => {
+        setSelectedUser(customer);
+        setIsUserOrdersModalOpen(true);
+    };
 
     const openOrderDetails = (order) => {
         setSelectedOrder(order);
@@ -275,59 +398,148 @@ const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
     // --- Render Tabs (Đã Fix Whitespace & Accessibility) ---
 
+
 // [MỚI] Hàm Render Tab Thống kê
     const renderStatsTab = () => {
-        if (!stats) return <div className="text-center p-4">Đang tải thống kê...</div>;
+        if (!stats) return null; 
+
+        // Format data cho biểu đồ
+        const monthNames = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
+        const monthlyData = monthNames.map((month, index) => ({
+            name: month,
+            DoanhThu: stats.monthlySales.find(s => s._id === index + 1)?.totalRevenue || 0
+        }));
+        
+        const categoryData = stats.categorySales.map(cat => ({
+            name: getCategoryDisplayName(cat._id),
+            value: cat.totalRevenue
+        }));
+        
+        const overallTotalRevenue = stats.monthlySales.reduce((acc, curr) => acc + curr.totalRevenue, 0);
 
         return (
-            <div className="space-y-6">
+           <div className="space-y-8">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center">
                     <BarChart2 size={24} className="mr-2"/> Tổng quan Bán hàng
                 </h2>
                 
-                {/* Thẻ KIPs */}
+                {/* Thẻ KIPs [ĐÃ SỬA LỖI] */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-green-100 p-4 rounded-lg shadow">
                         <DollarSign size={20} className="text-green-700" />
-                        <p className="text-sm text-gray-600 mt-1">Tổng Doanh Thu</p>
+                        <p className="text-sm text-gray-600 mt-1">Tổng Doanh Thu (Năm nay)</p>
                         <p className="text-2xl font-bold text-green-700">
-                            {stats.totalRevenue.toLocaleString('vi-VN')}₫
+                            {overallTotalRevenue.toLocaleString('vi-VN')}₫
                         </p>
                     </div>
                     <div className="bg-blue-100 p-4 rounded-lg shadow">
                         <ListOrdered size={20} className="text-blue-700" />
-                        <p className="text-sm text-gray-600 mt-1">Tổng Đơn Hàng</p>
+                        <p className="text-sm text-gray-600 mt-1">Tổng Đơn Hàng (Hợp lệ)</p>
+                        {/* Sửa: dùng stats.totalOrders */}
                         <p className="text-2xl font-bold text-blue-700">{stats.totalOrders}</p>
                     </div>
                     <div className="bg-indigo-100 p-4 rounded-lg shadow">
                         <Package size={20} className="text-indigo-700" />
                         <p className="text-sm text-gray-600 mt-1">Tổng Sản Phẩm</p>
+                        {/* Sửa: dùng stats.totalProducts */}
                         <p className="text-2xl font-bold text-indigo-700">{stats.totalProducts}</p>
                     </div>
                     <div className="bg-yellow-100 p-4 rounded-lg shadow">
                         <UserCheck size={20} className="text-yellow-700" />
                         <p className="text-sm text-gray-600 mt-1">Tổng Khách Hàng</p>
+                        {/* Sửa: dùng stats.totalUsers */}
                         <p className="text-2xl font-bold text-yellow-700">{stats.totalUsers}</p>
                     </div>
                 </div>
 
-                {/* Top Sản phẩm Bán chạy */}
+                {/* Biểu đồ Doanh thu theo Tháng */}
                 <div>
-                    <h3 className="text-xl font-bold text-gray-800 mt-6 mb-3">Top 5 Sản phẩm Bán chạy</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg shadow-inner">
-                        <ul className="space-y-2">
-                            {stats.topSellingProducts.map((product, index) => (
-                                <li key={index} className="flex justify-between items-center p-2 rounded bg-white shadow-sm">
-                                    <span className="font-medium text-gray-700">{product._id}</span>
-                                    <span className="font-bold text-green-600">{product.totalQuantitySold} đã bán</span>
-                                </li>
+                    <h3 className="text-xl font-bold text-gray-800 mt-6 mb-3">Doanh thu theo Tháng (Năm nay)</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg shadow-inner w-full h-80">
+                        <ResponsiveContainer>
+                            <BarChart data={monthlyData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="name" />
+                                <YAxis tickFormatter={(value) => `${value/1000000}Tr ₫`} />
+                                <Tooltip formatter={(value) => `${value.toLocaleString('vi-VN')}₫`} />
+                                <Legend />
+                                <Bar dataKey="DoanhThu" fill="#0088FE" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Biểu đồ tròn Phân loại */}
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-800 mt-6 mb-3">Tỷ trọng Doanh thu theo Phân loại</h3>
+                        <div className="bg-gray-50 p-4 rounded-lg shadow-inner w-full h-80">
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Pie 
+                                        data={categoryData} 
+                                        dataKey="value" // Kích thước miếng bánh dựa trên 'value' (tiền)
+                                        nameKey="name" 
+                                        cx="50%" 
+                                        cy="50%" 
+                                        outerRadius={100} 
+                                        fill="#8884d8" 
+                                        labelLine={false} // Tắt đường gạch
+                                        label={renderCustomizedLabel} // [SỬA LỖI] Dùng hàm render %
+                                    >
+                                        {categoryData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    {/* [SỬA LỖI] Tooltip (hover) sẽ hiển thị tiền */}
+                                    <PieTooltip formatter={(value) => `${value.toLocaleString('vi-VN')}₫`} />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Top Khách hàng */}
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-800 mt-6 mb-3">Top 10 Khách hàng</h3>
+                        <div className="flex items-center space-x-2 mb-3">
+                            <label htmlFor="minSpend" className="text-sm">Lọc theo chi tiêu tối thiểu:</label>
+                            <input 
+                                type="number" 
+                                id="minSpend"
+                                value={minSpend}
+                                onChange={(e) => setMinSpend(Number(e.target.value))}
+                                className="p-1 border rounded-lg w-28"
+                            />
+                            <button onClick={handleFetchTopCustomers} className="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm">Lọc</button>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg shadow-inner space-y-2 h-80 overflow-y-auto">
+                            {topCustomers.length === 0 && <p className="text-gray-500">Không có khách hàng nào.</p>}
+                            {topCustomers.map((cust, index) => (
+                                <div key={cust.userId} className="flex justify-between items-center p-2 rounded bg-white shadow-sm">
+                                    <div className="font-medium text-gray-700">
+                                        <span className="font-bold">{index + 1}.</span> {cust.name}
+                                        <p className="text-xs text-gray-500">{cust.email}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="font-bold text-green-600 block">{cust.totalSpent.toLocaleString('vi-VN')}₫</span>
+                                        <button 
+                                            onClick={() => openUserOrders(cust)}
+                                            className="text-xs text-blue-500 hover:underline"
+                                        >
+                                            ({cust.orderCount} đơn hàng)
+                                        </button>
+                                    </div>
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     </div>
                 </div>
             </div>
         );
     };
+
+
 
     const renderProductsTab = () => (
         <div className="space-y-6">
@@ -566,6 +778,14 @@ const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
             {/* Order Detail Modal */}
             {isDetailModalOpen && (
                 <OrderDetailsModal order={selectedOrder} onClose={() => setIsDetailModalOpen(false)} />
+            )}
+            {/* [SỬA LỖI] THÊM KIỂM TRA selectedUser */}
+            {isUserOrdersModalOpen && selectedUser && (
+                <UserOrdersModal 
+                    userId={selectedUser.userId} 
+                    userName={selectedUser.name} 
+                    onClose={() => setIsUserOrdersModalOpen(false)} 
+                />
             )}
         </div>
     );
