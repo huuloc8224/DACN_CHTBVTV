@@ -14,6 +14,7 @@ require('./models/Order');
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const userRoutes = require('./routes/userRoutes'); // [MỚI] Import userRoutes
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,6 +47,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/users', userRoutes); // [MỚI] Đăng ký userRoutes
 
 app.get('/', (req, res) => {
   res.send('🌿 Thuốc BVTV API Server is running.');

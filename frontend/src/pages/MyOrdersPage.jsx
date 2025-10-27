@@ -44,7 +44,7 @@ const MyOrdersPage = () => {
         } else if (!authLoading && !user) {
             navigate('/login');
         }
-    }, [authLoading, user]);
+    }, [authLoading, user, navigate]);
 
 
     const handleCancelOrder = async (orderId) => {
@@ -56,10 +56,9 @@ const MyOrdersPage = () => {
 
         if (window.confirm(`XÁC NHẬN HỦY: Bạn có chắc chắn muốn hủy đơn hàng ${orderId.substring(0, 8)}...?`)) {
             try {
-                // API PUT /api/orders/cancel/:id
                 const res = await api.put(`/orders/cancel/${orderId}`);
                 setStatusMessage(`Đơn hàng ${orderId.substring(0, 8)}... đã được hủy thành công!`);
-                fetchMyOrders(); // Tải lại danh sách
+                fetchMyOrders(); 
             } catch (err) {
                 setStatusMessage(`Lỗi hủy đơn: ${err.response?.data?.message || 'Lỗi kết nối.'}`);
             }
@@ -88,7 +87,7 @@ const MyOrdersPage = () => {
                     <thead className="bg-gray-100 border-b">
                         <tr>
                             <th className="py-3 px-4 text-left">ID Đơn hàng</th>
-                            <th className="py-3 px-4 text-left">Ngày đặt</th>
+                            <th className="py-3 px-4 text-left">Ngày đặt</th> {/* [MỚI] Thêm cột Ngày đặt */}
                             <th className="py-3 px-4 text-left">Tổng tiền</th>
                             <th className="py-3 px-4 text-left">Trạng thái</th>
                             <th className="py-3 px-4 text-center">Chi tiết</th>
@@ -102,7 +101,8 @@ const MyOrdersPage = () => {
                             orders.map((order) => (
                                 <tr key={order._id} className="border-b hover:bg-gray-50">
                                     <td className="py-3 px-4">{order._id.substring(0, 8)}...</td>
-                                    <td className="py-3 px-4">{formatDate(order.orderDate)}</td>
+                                    {/* [MỚI] Hiển thị orderDate (hoặc createdAt) */}
+                                    <td className="py-3 px-4">{formatDate(order.orderDate || order.createdAt)}</td>
                                     <td className="py-3 px-4 font-semibold">{formatCurrency(order.totalAmount)}</td>
                                     <td className="py-3 px-4">
                                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -113,7 +113,6 @@ const MyOrdersPage = () => {
                                             {order.status}
                                         </span>
                                     </td>
-                                    {/* [MỚI] NÚT XEM CHI TIẾT */}
                                     <td className="py-3 px-4 text-center">
                                         <Link 
                                             to={`/order/${order._id}`} 

@@ -21,7 +21,7 @@ const formatDate = (dateString) => {
 };
 
 const OrderDetailPage = () => {
-    const { id: orderId } = useParams(); // Lấy ID đơn hàng từ URL
+const { id: orderId } = useParams(); 
     const { user } = useAuth();
     
     const [order, setOrder] = useState(null);
@@ -29,13 +29,12 @@ const OrderDetailPage = () => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (!user) return; // Đảm bảo user đã đăng nhập
+        if (!user) return; 
 
         const fetchOrder = async () => {
             setLoading(true);
             setError('');
             try {
-                // Gọi API Backend để lấy chi tiết đơn hàng
                 const { data } = await api.get(`/orders/${orderId}`);
                 setOrder(data);
             } catch (err) {
@@ -49,7 +48,7 @@ const OrderDetailPage = () => {
         fetchOrder();
     }, [orderId, user]);
 
-    if (loading) {
+   if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
                 <Loader size={32} className="animate-spin text-green-600" />
@@ -57,7 +56,6 @@ const OrderDetailPage = () => {
             </div>
         );
     }
-
     if (error) {
         return (
             <div className="max-w-3xl mx-auto p-6 bg-red-100 text-red-700 rounded-lg shadow-md flex items-center">
@@ -66,11 +64,9 @@ const OrderDetailPage = () => {
             </div>
         );
     }
-
     if (!order) {
         return <div className="text-center text-xl text-gray-500">Không tìm thấy đơn hàng.</div>;
     }
-
     // [SỬA LỖI] Tính toán Tạm tính (itemsPrice)
     // Phải dùng 'unitPrice' (từ Schema) thay vì 'price'
     const itemsPrice = order.orderItems.reduce((acc, item) => acc + item.unitPrice * item.quantity, 0);
@@ -88,7 +84,11 @@ const OrderDetailPage = () => {
             <h1 className="text-3xl font-extrabold text-gray-800 mb-4">
                 Chi tiết Đơn hàng <span className="text-green-600">#{order._id.substring(0, 8)}...</span>
             </h1>
-            <p className="text-gray-500 mb-6">Đặt ngày: {formatDate(order.createdAt)}</p>
+            
+            {/* [SỬA LỖI] Hiển thị createdAt hoặc orderDate */}
+            <p className="text-gray-500 mb-6">
+                Đặt ngày: {formatDate(order.orderDate || order.createdAt)}
+            </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
@@ -170,12 +170,10 @@ const OrderDetailPage = () => {
                                 <div className="flex-1">
                                     <p className="font-semibold text-gray-800">{item.name}</p>
                                     <p className="text-sm text-gray-600">
-                                        {/* [SỬA LỖI] Dùng item.unitPrice */}
                                         {item.quantity} x {formatCurrency(item.unitPrice)}
                                     </p>
                                 </div>
                                 <p className="font-medium text-gray-700">
-                                    {/* [SỬA LỖI] Dùng item.unitPrice */}
                                     {formatCurrency(item.quantity * item.unitPrice)}
                                 </p>
                             </div>
@@ -189,17 +187,14 @@ const OrderDetailPage = () => {
                             </div>
                             <div className="flex justify-between text-gray-700">
                                 <span>Phí giao hàng:</span>
-                                {/* [SỬA LỖI] Hardcode là 0 nếu DB không có */}
                                 <span>{formatCurrency(order.shippingPrice || 0)}</span>
                             </div>
                             <div className="flex justify-between text-gray-700">
                                 <span>Thuế (VAT):</span>
-                                {/* [SỬA LỖI] Hardcode là 0 nếu DB không có */}
                                 <span>{formatCurrency(order.taxPrice || 0)}</span>
                             </div>
                             <div className="flex justify-between text-2xl font-bold text-gray-900 mt-2 pt-2 border-t">
                                 <span>Tổng cộng:</span>
-                                {/* [SỬA LỖI] Dùng totalAmount (từ Schema) thay vì totalPrice */}
                                 <span className="text-green-700">{formatCurrency(order.totalAmount)}</span>
                             </div>
                         </div>
@@ -209,4 +204,5 @@ const OrderDetailPage = () => {
         </div>
     );
 };
+
 export default OrderDetailPage;

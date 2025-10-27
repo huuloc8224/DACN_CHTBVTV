@@ -78,11 +78,10 @@ const ProductDetail = () => {
                 {/* Image Section */}
                 <div>
                     <img 
-                        src={imageUrl} 
-                        alt={product.name} 
-                        className="w-full h-80 object-cover rounded-xl shadow-md"
-                        onError={(e) => { e.target.src = placeholderImg; }}
-                    />
+                    src={product.image_url || placeholderImg} 
+                    alt={product.name} 
+                    className="w-50 h-full object-contain p-4 rounded-t-xl hover:opacity-90 transition bg-gray-100" // [ĐÃ SỬA]
+                    onError={(e) => { e.target.onerror = null; e.target.src = placeholderImg; }}                    />
                 </div>
 
                 {/* Details Section */}

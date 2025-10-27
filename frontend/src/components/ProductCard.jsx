@@ -18,10 +18,10 @@ const ProductCard = ({ product }) => {
         <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition duration-300 overflow-hidden border border-gray-100 flex flex-col">
             <Link to={`/products/${id}`} className="block">
                 <img 
-                    src={imageUrl} 
+                    src={product.image_url || placeholderImg} 
                     alt={product.name} 
-                    className="w-full h-48 object-cover p-4 rounded-t-xl hover:opacity-90 transition"
-                    onError={(e) => { e.target.src = placeholderImg; }}
+                    className="w-full h-64 object-contain p-4 rounded-t-xl hover:opacity-90 transition bg-gray-100" // [ĐÃ SỬA]
+                    onError={(e) => { e.target.onerror = null; e.target.src = placeholderImg; }}
                 />
             </Link>
             <div className="p-5 flex-grow flex flex-col justify-between">

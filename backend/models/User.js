@@ -2,11 +2,34 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
+
+// [MỚI] Tạo một Schema con cho Địa chỉ
+const AddressSchema = new mongoose.Schema({
+    recipientName: { // Tên người nhận (có thể khác tên tài khoản)
+        type: String,
+        required: true
+    },
+    phoneNumber: {
+        type: String,
+        required: true
+    },
+    addressLine: { // Địa chỉ chi tiết (Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP)
+        type: String,
+        required: true
+    },
+    isDefault: { // (Tùy chọn) Đánh dấu địa chỉ mặc định
+        type: Boolean,
+        default: false
+    }
+});
+
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password_hash: { type: String, required: true },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    // [THAY ĐỔI] Thêm mảng địa chỉ
+    addresses: [AddressSchema]
 }, { timestamps: true });
 
 // Mongoose Pre-Save Hook để Hash mật khẩu

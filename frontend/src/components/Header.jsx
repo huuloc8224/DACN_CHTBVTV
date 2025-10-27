@@ -12,15 +12,18 @@ const Header = () => {
 
     return (
         <header className="bg-green-700 text-white shadow-lg sticky top-0 z-40">
-            <div className="container mx-auto flex justify-between items-center p-4">
+            <div className="container mx-auto flex justify-between items-center p-2">
                 {/* Logo / Project Name */}
                 
-                <Link to="/" className="text-6xl font-extrabold tracking-wider hover:text-green-200 transition font-mono">
+                <Link to="/" className="flex text-6xl font-extrabold tracking-wider hover:text-green-200 transition font-mono">
                     <img 
-                        src="img\logo.png" // Thay bằng đường dẫn tới logo của bạn
+                        src="images\logo.png" // Thay bằng đường dẫn tới logo của bạn
                         alt="TBVTV Logo"
-                        className="h-20 w-auto" // Chiều cao 8 đơn vị (khoảng 32px)
+                        className="h-20 w-auto p-2" // Chiều cao 8 đơn vị (khoảng 32px)
                     />
+                    <div className="text-4xl font-extrabold tracking-wider font-mono p-5">
+                        VẬT TƯ NÔNG NGHIỆP
+                    </div>
                 </Link>
 
                 {/* Navigation Links */}
@@ -36,8 +39,6 @@ const Header = () => {
                     <Link to="/myorders" className="flex items-center hover:text-green-200 transition">
                             <ShoppingBag size={18} className="mr-1"/> Đơn hàng
                     </Link>
-
-                    <Link to="/contact" className="flex items-center hover:text-green-200 transition"> Liên hệ</Link>
 
                     {isAdmin && (
                         <Link to="/admin" className="flex items-center hover:text-green-200 transition bg-green-800 px-3 py-1 rounded-full">

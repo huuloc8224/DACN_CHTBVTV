@@ -5,15 +5,17 @@ const User = require('../models/User'); // <--- [SỬA LỖI] THÊM DÒNG NÀY
 const mongoose = require('mongoose');
 // [USER] TẠO ĐƠN HÀNG
 exports.createOrder = async (req, res) => {
-    const { orderItems, shippingAddress, totalAmount, phoneNumber, paymentMethod } = req.body; 
+    const { orderItems, totalAmount, paymentMethod, shippingAddress } = req.body; 
     try {
         const newOrder = await Order.create({
-            userId: req.user.id, // Lấy ID người dùng từ Middleware Auth
+            userId: req.user.id, 
             orderItems,
-            shippingAddress,
             totalAmount,
-            phoneNumber,
             paymentMethod,
+            // Lưu trữ Tên, SĐT, Địa chỉ (snapshot tại thời điểm đặt hàng)
+            shippingAddress: shippingAddress.addressLine, 
+            phoneNumber: shippingAddress.phoneNumber, 
+            recipientName: shippingAddress.recipientName, // Thêm trường này vào Order.js nếu cần
             status: 'Pending'
         });
         res.status(201).json(newOrder);
@@ -168,7 +170,7 @@ exports.getOrderById = async (req, res) => {
     }
 };
 
-// === [TÍNH NĂNG THỐNG KÊ MỚI] ===
+// === [TÍNH NĂNG THỐNG KÊ MỚI - ĐÃ SỬA LỖI LOGIC] ===
 
 /**
  * @desc    Lấy Thống kê Doanh thu (VÀ TỔNG QUAN)
@@ -180,19 +182,26 @@ exports.getSalesStatistics = async (req, res) => {
         const now = new Date();
         const startOfYear = new Date(now.getFullYear(), 0, 1);
 
+        // [SỬA LỖI] Chỉ $match các đơn hàng 'Delivered'
+        const filterDelivered = { 
+            status: 'Delivered', 
+            createdAt: { $gte: startOfYear } 
+        };
+        const filterDeliveredAllTime = { status: 'Delivered' };
+
         // 1. Doanh thu theo Tháng (trong năm nay)
         const monthlySales = await Order.aggregate([
-            { $match: { status: { $ne: 'Cancelled' }, createdAt: { $gte: startOfYear } } },
+            { $match: filterDelivered },
             { $group: { _id: { $month: "$createdAt" }, totalRevenue: { $sum: "$totalAmount" } } },
             { $sort: { "_id": 1 } }
         ]);
 
         // 2. Doanh thu theo Phân loại Sản phẩm (Category)
         const categorySales = await Order.aggregate([
-            { $match: { status: { $ne: 'Cancelled' } } },
+            { $match: filterDeliveredAllTime }, // Tính trên tất cả đơn đã giao
             { $unwind: "$orderItems" },
             {
-                $lookup: { // Join với collection 'products'
+                $lookup: { 
                     from: "products",
                     localField: "orderItems.productId",
                     foreignField: "_id",
@@ -202,7 +211,7 @@ exports.getSalesStatistics = async (req, res) => {
             { $unwind: "$productDetails" },
             {
                 $group: {
-                    _id: "$productDetails.category", // Nhóm theo category
+                    _id: "$productDetails.category", 
                     totalRevenue: { $sum: { $multiply: ["$orderItems.unitPrice", "$orderItems.quantity"] } }
                 }
             }
@@ -210,15 +219,16 @@ exports.getSalesStatistics = async (req, res) => {
 
         // 3. Lấy 3 số liệu tổng quan
         const totalProducts = await Product.countDocuments();
-        const totalUsers = await User.countDocuments(); // [ĐÃ SỬA] Dùng User model đã import
-        const totalOrders = await Order.countDocuments({ status: { $ne: 'Cancelled' } }); 
+        const totalUsers = await User.countDocuments(); 
+        // [SỬA LỖI] Chỉ đếm đơn hàng đã giao
+        const totalDeliveredOrders = await Order.countDocuments(filterDeliveredAllTime); 
 
         res.json({
             monthlySales, 
             categorySales,
             totalProducts: totalProducts,
             totalUsers: totalUsers,
-            totalOrders: totalOrders
+            totalOrders: totalDeliveredOrders // Trả về số đơn đã giao
         });
 
     } catch (error) {
@@ -226,30 +236,28 @@ exports.getSalesStatistics = async (req, res) => {
         res.status(500).json({ message: 'Lỗi server khi lấy dữ liệu thống kê.' });
     }
 };
+
 /**
  * @desc    Lấy Top Khách hàng theo Doanh thu
  * @route   GET /api/orders/stats/top-customers
  * @access  Private/Admin
  */
 exports.getTopCustomers = async (req, res) => {
-    // Lấy ngưỡng chi tiêu từ query, mặc định là 0
     const minSpend = Number(req.query.minSpend) || 0; 
     
     try {
         const topCustomers = await Order.aggregate([
-            { $match: { status: { $ne: 'Cancelled' } } },
+            { $match: { status: 'Delivered' } }, // [SỬA LỖI] Chỉ tính đơn đã giao
             {
                 $group: {
-                    _id: "$userId", // Nhóm theo ID khách hàng
+                    _id: "$userId", 
                     totalSpent: { $sum: "$totalAmount" },
                     orderCount: { $sum: 1 }
                 }
             },
+            { $match: { totalSpent: { $gte: minSpend } } },
             {
-                $match: { totalSpent: { $gte: minSpend } } // Lọc theo ngưỡng chi tiêu
-            },
-            {
-                $lookup: { // Join với collection 'users'
+                $lookup: { 
                     from: "users",
                     localField: "_id",
                     foreignField: "_id",
@@ -258,7 +266,7 @@ exports.getTopCustomers = async (req, res) => {
             },
             { $unwind: "$userDetails" },
             {
-                $project: { // Chọn lọc thông tin trả về
+                $project: { 
                     userId: "$_id",
                     name: "$userDetails.name",
                     email: "$userDetails.email",
@@ -266,8 +274,8 @@ exports.getTopCustomers = async (req, res) => {
                     orderCount: 1
                 }
             },
-            { $sort: { totalSpent: -1 } }, // Sắp xếp giảm dần
-            { $limit: 10 } // Lấy top 10
+            { $sort: { totalSpent: -1 } }, 
+            { $limit: 10 } 
         ]);
 
         res.json(topCustomers);

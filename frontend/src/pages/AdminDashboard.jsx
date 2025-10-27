@@ -19,6 +19,14 @@ const CATEGORY_OPTIONS = [
     { value: 'thucan', label: 'Thức Ăn Gia Súc/Gia Cầm' }
 ];
 
+
+// [MỚI] Thêm hàm helper formatDate (nếu chưa có)
+const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+    });
+};
 // [SỬA LỖI] THÊM KHAI BÁO MÀNG MÀU CHO BIỂU ĐỒ
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
@@ -400,15 +408,18 @@ const AdminDashboard = () => {
 
 
 // [MỚI] Hàm Render Tab Thống kê
-    const renderStatsTab = () => {
-        if (!stats) return null; 
+const renderStatsTab = () => {
+        if (!stats) return null;
 
         // Format data cho biểu đồ
         const monthNames = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
         const monthlyData = monthNames.map((month, index) => ({
             name: month,
-            DoanhThu: stats.monthlySales.find(s => s._id === index + 1)?.totalRevenue || 0
+            // [SỬA LỖI] Doanh thu này đã được lọc (chỉ 'Delivered') từ Backend
+            DoanhThu: stats.monthlySales.find(s => s._id === index + 1)?.totalRevenue || 0 
         }));
+
+        const totalCategoryRevenue = stats.categorySales.reduce((acc, cat) => acc + cat.totalRevenue, 0);
         
         const categoryData = stats.categorySales.map(cat => ({
             name: getCategoryDisplayName(cat._id),
@@ -427,15 +438,15 @@ const AdminDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="bg-green-100 p-4 rounded-lg shadow">
                         <DollarSign size={20} className="text-green-700" />
-                        <p className="text-sm text-gray-600 mt-1">Tổng Doanh Thu (Năm nay)</p>
+                        <p className="text-sm text-gray-600 mt-1">Tổng Doanh Thu (Đã giao)</p>
                         <p className="text-2xl font-bold text-green-700">
                             {overallTotalRevenue.toLocaleString('vi-VN')}₫
                         </p>
                     </div>
                     <div className="bg-blue-100 p-4 rounded-lg shadow">
                         <ListOrdered size={20} className="text-blue-700" />
-                        <p className="text-sm text-gray-600 mt-1">Tổng Đơn Hàng (Hợp lệ)</p>
-                        {/* Sửa: dùng stats.totalOrders */}
+                        <p className="text-sm text-gray-600 mt-1">Tổng Đơn Hàng (Đã giao)</p>
+                        {/* Sửa: dùng stats.totalOrders (đã được lọc từ Backend) */}
                         <p className="text-2xl font-bold text-blue-700">{stats.totalOrders}</p>
                     </div>
                     <div className="bg-indigo-100 p-4 rounded-lg shadow">
@@ -662,12 +673,25 @@ const AdminDashboard = () => {
             <h2 className="text-2xl font-bold text-gray-800 flex items-center"><Truck size={24} className="mr-2"/> Quản lý Đơn hàng ({orders.length})</h2>
             <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden text-sm">
                 <thead className="bg-gray-100 border-b">
-                    <tr><th className="py-2 px-4 text-left">ID ĐH</th><th className="py-2 px-4 text-left">Khách hàng</th><th className="py-2 px-4 text-left">Tổng tiền</th><th className="py-2 px-4 text-left">Trạng thái</th><th className="py-2 px-4 text-left">Chi tiết</th><th className="py-2 px-4 text-left">Thao tác</th><th className="py-2 px-4 text-left">Xóa</th></tr>
+                    <tr>
+                        {/* [SỬA LẠI] Thêm cột Ngày đặt */}
+                        <th className="py-2 px-4 text-left">ID ĐH</th>
+                        <th className="py-2 px-4 text-left">Ngày đặt</th>
+                        <th className="py-2 px-4 text-left">Khách hàng</th>
+                        <th className="py-2 px-4 text-left">Tổng tiền</th>
+                        <th className="py-2 px-4 text-left">Trạng thái</th>
+                        <th className="py-2 px-4 text-left">Chi tiết</th>
+                        <th className="py-2 px-4 text-left">Thao tác</th>
+                        <th className="py-2 px-4 text-left">Xóa</th>
+                    </tr>
                 </thead>
                 <tbody>
                     {orders.map(o => (
                         <tr key={o._id} className="border-b hover:bg-gray-50">
-                            <td className="py-2 px-4">{o._id.substring(0, 6)}...</td><td className="py-2 px-4 font-medium">{o.userId?.name || o.userId?.email || 'Guest'}</td>
+                            <td className="py-2 px-4">{o._id.substring(0, 6)}...</td>
+                            {/* [MỚI] Hiển thị Ngày đặt */}
+                            <td className="py-2 px-4">{formatDate(o.orderDate || o.createdAt)}</td>
+                            <td className="py-2 px-4 font-medium">{o.userId?.name || o.userId?.email || 'Guest'}</td>
                             <td className="py-2 px-4 font-semibold">{o.totalAmount.toLocaleString('vi-VN')}₫</td>
                             <td className="py-2 px-4">
                                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -679,9 +703,14 @@ const AdminDashboard = () => {
                                 </span>
                             </td>
                             <td className="py-2 px-4">
-                                <button onClick={() => openOrderDetails(o)} className="text-blue-600 hover:text-blue-800">
+                                {/* [SỬA LẠI] Dùng Link thay vì button (nếu OrderDetailsModal đã bị xóa) */}
+                                {/* Nếu vẫn dùng Modal, giữ nguyên <button> */}
+                                <Link to={`/order/${o._id}`} className="text-blue-600 hover:text-blue-800">
                                     <Eye size={18}/>
-                                </button>
+                                </Link>
+                                {/* <button onClick={() => openOrderDetails(o)} className="text-blue-600 hover:text-blue-800">
+                                    <Eye size={18}/>
+                                </button> */}
                             </td>
                             <td className="py-2 px-4">
                                 <select 
