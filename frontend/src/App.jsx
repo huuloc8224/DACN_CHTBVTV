@@ -5,6 +5,8 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import MyOrdersPage from './pages/MyOrdersPage.jsx';
 import OrderDetailPage from './pages/OrderDetailPage.jsx'; //
+import ChatWidget from './components/ChatWidget';
+
 
 import HomePage from './pages/HomePage'; 
 import ProductsPage from './pages/ProductsPage';
@@ -38,6 +40,7 @@ function App() {
         </Routes>
       </main>
       <Footer />
+      <ChatWidget /> {/* [MỚI] Thêm ChatWidget */}
     </div>
   );
 }

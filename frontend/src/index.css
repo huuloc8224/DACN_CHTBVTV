@@ -2,20 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Thêm font Inter và các style chung */
+/* Font và reset */
 body {
-    font-family: 'Inter', sans-serif;
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-/* Tùy chỉnh các animation dùng trong HomePage */
+/* Animation trang chủ (nếu có dùng) */
 @keyframes bounce-slow {
-    0%, 100% { transform: translateY(-5%); }
-    50% { transform: translateY(5%); }
+  0%, 100% { transform: translateY(-5%); }
+  50% { transform: translateY(5%); }
+}
+.animate-bounce-slow {
+  animation: bounce-slow 4s infinite ease-in-out;
 }
 
-.animate-bounce-slow {
-    animation: bounce-slow 4s infinite ease-in-out;
+/* ===== FIX MARKDOWN TRÀN KHUNG CHAT ===== */
+/* Đảm bảo nội dung chat không tràn khung */
+.markdown-content, .chat-message {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.markdown-content ul, .chat-message ul {
+  margin-left: 1rem;
+  list-style-type: disc;
+}
+
+.markdown-content p {
+  margin-bottom: 0.3rem;
 }
