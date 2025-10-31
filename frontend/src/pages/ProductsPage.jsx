@@ -2,14 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import ProductCard from '../components/ProductCard';
-import { RefreshCcw, Filter, Package, Search, Loader } from 'lucide-react';
+import { RefreshCcw, Filter, Package, Search, Loader, ChevronsUpDown } from 'lucide-react'; // Thêm icon Sắp xếp
 
-// [MỚI] Tùy chọn lọc Phân loại
+// Tùy chọn lọc Phân loại
 const CATEGORY_OPTIONS = [
-    { value: '', label: 'Tất cả Phân loại' }, // Lựa chọn mặc định
+    { value: '', label: 'Tất cả Phân loại' }, 
     { value: 'thuoc', label: 'Thuốc BVTV' },
     { value: 'phan', label: 'Phân Bón' },
-    { value: 'thucan', label: 'Thức Ăn Gia Súc/Gia Cầm' }
+    { value: 'thucan', label: 'Thức Ăn' }
+];
+
+// [MỚI] Tùy chọn Sắp xếp
+const SORT_OPTIONS = [
+    { value: 'name-asc', label: 'Mặc định (Tên A-Z)' },
+    { value: 'price-asc', label: 'Giá Thấp đến Cao' },
+    { value: 'price-desc', label: 'Giá Cao đến Thấp' }
 ];
 
 const ProductsPage = () => {
@@ -17,20 +24,27 @@ const ProductsPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // [MỚI] States cho bộ lọc
-    const [category, setCategory] = useState(''); // State cho dropdown
-    const [search, setSearch] = useState(''); // State cho input tìm kiếm
-    const [searchTerm, setSearchTerm] = useState(''); // Giá trị dùng để gửi đi
+    // States cho bộ lọc
+    const [category, setCategory] = useState('');
+    const [search, setSearch] = useState(''); 
+    const [searchTerm, setSearchTerm] = useState('');
+    const [activeIngredient, setActiveIngredient] = useState(''); 
+    const [activeIngredientTerm, setActiveIngredientTerm] = useState('');
+    
+    // [MỚI] State cho Sắp xếp
+    const [sort, setSort] = useState('name-asc'); 
 
     const fetchProducts = async () => {
         setLoading(true);
         setError(null);
         try {
-            // [SỬA LẠI] Gửi các tham số filter lên Backend
+            // [SỬA LẠI] Gửi tất cả tham số filter/sort lên Backend
             const res = await api.get('/products', {
                 params: {
-                    category: category || undefined, // Gửi nếu category có giá trị
-                    search: searchTerm || undefined // Gửi nếu searchTerm có giá trị
+                    category: category || undefined, 
+                    search: searchTerm || undefined,
+                    active_ingredient: activeIngredientTerm || undefined,
+                    sort: sort // [MỚI] Gửi tham số sort
                 }
             });
             setProducts(res.data);
@@ -42,15 +56,16 @@ const ProductsPage = () => {
         }
     };
 
-    // [SỬA LẠI] Dùng useEffect để tự động gọi API khi filter thay đổi
+    // [SỬA LẠI] Dùng useEffect để tự động gọi API khi filter/sort thay đổi
     useEffect(() => {
         fetchProducts();
-    }, [category, searchTerm]); // Tự động gọi lại khi category hoặc searchTerm thay đổi
+    }, [category, searchTerm, activeIngredientTerm, sort]); // [MỚI] Thêm 'sort'
 
-    // Hàm xử lý khi nhấn nút tìm kiếm
+    // Hàm xử lý khi nhấn nút tìm kiếm (cho cả 2 ô)
     const handleSearchSubmit = (e) => {
         e.preventDefault();
-        setSearchTerm(search); // Cập nhật searchTerm để trigger useEffect
+        setSearchTerm(search); 
+        setActiveIngredientTerm(activeIngredient); 
     };
 
     // Hàm xử lý khi nhấn nút Tải lại (Reset bộ lọc)
@@ -58,44 +73,71 @@ const ProductsPage = () => {
         setCategory('');
         setSearch('');
         setSearchTerm('');
+        setActiveIngredient('');
+        setActiveIngredientTerm('');
+        setSort('name-asc'); // [MỚI] Reset sort
     };
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="flex gap-3">
+
             {/* Sidebar Filter */}
-            <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg h-fit sticky top-20 border border-gray-100">
+            <div className="w-[225px] bg-white p-4 rounded-xl shadow-md h-fit sticky top-20 border border-gray-100">
+    {/* Bộ lọc */}
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center"><Filter size={20} className="mr-2"/> Bộ lọc</h2>
                 
                 {/* Search Form */}
-                <form onSubmit={handleSearchSubmit} className="mb-4">
-                    <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">Tìm theo tên</label>
-                    <div className="flex">
+                <form onSubmit={handleSearchSubmit} className="space-y-4 mb-4">
+                    {/* ... (Search by Name) ... */}
+                    <div>
+                        <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">Tìm theo tên</label>
                         <input
-                            type="text"
-                            id="search"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Tìm tên sản phẩm..."
-                            className="w-full p-2 border rounded-l-lg focus:outline-green-500"
+                            type="text" id="search" value={search} onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Tìm tên sản phẩm"
+                            className="w-full p-2 border rounded-lg focus:outline-green-500"
                         />
-                        <button type="submit" className="bg-green-600 text-white p-2 rounded-r-lg hover:bg-green-700">
-                            <Search size={20}/>
-                        </button>
                     </div>
+                    
+                    {/* ... (Search by Active Ingredient) ... */}
+                    <div>
+                        <label htmlFor="activeIngredient" className="block text-sm font-medium text-gray-700 mb-1">Tìm theo hoạt chất</label>
+                        <input
+                            type="text" id="activeIngredient" value={activeIngredient} onChange={(e) => setActiveIngredient(e.target.value)}
+                            placeholder="Tìm hoạt chất"
+                            className="w-full p-2 border rounded-lg focus:outline-green-500"
+                        />
+                    </div>
+
+                    <button type="submit" className="w-full bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 flex items-center justify-center">
+                        <Search size={20} className="mr-1"/> Tìm kiếm
+                    </button>
                 </form>
 
                 {/* Category Filter */}
                 <div className="mb-4">
                     <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">Phân loại</label>
                     <select 
-                        name="category" 
-                        id="category" 
-                        value={category} 
-                        onChange={(e) => setCategory(e.target.value)} // Cập nhật state category
+                        name="category" id="category" value={category} onChange={(e) => setCategory(e.target.value)} 
                         className="w-full p-3 border rounded-lg mt-1"
                     >
                         {CATEGORY_OPTIONS.map(cat => (
                             <option key={cat.value} value={cat.value}>{cat.label}</option>
+                        ))}
+                    </select>
+                </div>
+                
+                {/* [MỚI] Sort Filter */}
+                <div className="mb-4">
+                    <label htmlFor="sort" className="block text-sm font-medium text-gray-700 mb-1">Sắp xếp theo</label>
+                    <select 
+                        name="sort" 
+                        id="sort" 
+                        value={sort} 
+                        onChange={(e) => setSort(e.target.value)} // Cập nhật state sort
+                        className="w-full p-3 border rounded-lg mt-1"
+                    >
+                        {SORT_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                     </select>
                 </div>
@@ -106,10 +148,12 @@ const ProductsPage = () => {
             </div>
             
             {/* Product List */}
-            <div className="lg:col-span-3">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold text-gray-800 flex items-center"><Package size={24} className="mr-2"/> Danh sách Thuốc</h1>
-                </div>
+            <div className="flex-1">
+                {/* ... (H1) ... */}
+
+                <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <Package size={22} className="mr-2 text-green-600" /> Danh sách sản phẩm
+                </h1>
 
                 {error && <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
 
@@ -118,7 +162,7 @@ const ProductsPage = () => {
                         <Loader size={24} className="animate-spin mr-2"/> Đang tải sản phẩm...
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {products.length > 0 ? (
                             products.map(product => (
                                 <ProductCard key={product._id} product={product} />

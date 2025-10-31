@@ -6,25 +6,33 @@ const { v4: uuidv4 } = require('uuid');
 // [SỬA LẠI] Controller lấy tất cả sản phẩm (Thêm logic Filter)
 exports.getAllProducts = async (req, res) => {
     try {
-        // Lấy các tham số truy vấn (query params) từ URL
-        // (VD: /api/products?category=thuoc&search=anv)
-        const { category, search } = req.query;
+        // Lấy các tham số truy vấn (query params)
+        const { category, search, active_ingredient, sort } = req.query; // [MỚI] Thêm 'sort'
 
-        // 1. Xây dựng đối tượng Filter cho MongoDB
+        // 1. Xây dựng đối tượng Filter
         const filter = {};
-
         if (category) {
-            filter.category = category; // Lọc theo đúng category
+            filter.category = category; 
         }
-
         if (search) {
-            // Lọc theo tên, $regex cho phép tìm kiếm gần đúng
-            // $options: 'i' là không phân biệt chữ hoa/thường
             filter.name = { $regex: search, $options: 'i' }; 
         }
+        if (active_ingredient) {
+            filter.active_ingredient = { $regex: active_ingredient, $options: 'i' };
+        }
 
-        // 2. Tìm sản phẩm trong DB với bộ lọc đã tạo
-        const products = await Product.find(filter);
+        // 2. [MỚI] Xây dựng đối tượng Sort
+        let sortOption = {};
+        if (sort === 'price-asc') {
+            sortOption = { price: 1 }; // 1 = Tăng dần (Thấp đến Cao)
+        } else if (sort === 'price-desc') {
+            sortOption = { price: -1 }; // -1 = Giảm dần (Cao đến Thấp)
+        } else {
+            sortOption = { name: 1 }; // Mặc định sắp xếp theo tên A-Z
+        }
+
+        // 3. Tìm sản phẩm trong DB với filter VÀ sort
+        const products = await Product.find(filter).sort(sortOption);
         
         res.json(products);
     } catch (error) {
@@ -32,6 +40,7 @@ exports.getAllProducts = async (req, res) => {
         res.status(500).json({ message: 'Lỗi khi lấy danh sách sản phẩm' });
     }
 };
+
 
 
 
