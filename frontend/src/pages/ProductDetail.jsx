@@ -4,14 +4,14 @@ import api from '../services/api';
 import { useCart } from '../context/CartContext';
 import { PlusCircle, Leaf, Tag, Zap, ChevronLeft, Loader } from 'lucide-react';
 
-// [THÊM LẠI] Các tùy chọn Phân loại
+//Các tùy chọn Phân loại
 const CATEGORY_OPTIONS = [
     { value: 'thuoc', label: 'Thuốc BVTV' },
     { value: 'phan', label: 'Phân Bón' },
     { value: 'thucan', label: 'Thức Ăn Gia Súc/Gia Cầm' }
 ];
 
-// [THÊM LẠI] Hàm chuyển đổi tên code
+//Hàm chuyển đổi tên code
 const getCategoryDisplayName = (code) => {
     switch (code) {
         case 'thuoc': return 'Thuốc BVTV';
@@ -21,7 +21,7 @@ const getCategoryDisplayName = (code) => {
     }
 };
 
-const placeholderImg = "http://localhost:3001/images/placeholder.jpg"; 
+const placeholderImg = "http://localhost:3001/public/images/placeholder.jpg"; 
 
 const ProductDetail = () => {
     const { id } = useParams();
@@ -104,7 +104,6 @@ const ProductDetail = () => {
                         </div>
                         <div className="flex items-center text-gray-700">
                             <Leaf size={20} className="mr-2 text-green-500"/>
-                            {/* [SỬA LỖI] Gọi hàm đã được thêm */}
                             <span>Phân loại: {getCategoryDisplayName(product.category)}</span>
                         </div>
                     </div>

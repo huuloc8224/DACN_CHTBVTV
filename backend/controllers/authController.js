@@ -1,4 +1,4 @@
-// backend/controllers/authController.js
+
 const User = require('../models/User'); 
 const Order = require('../models/Order');
 const jwt = require('jsonwebtoken');
@@ -58,7 +58,7 @@ exports.loginUser = async (req, res) => {
     }
 };
 
-// [1] Admin xem danh sách TẤT CẢ người dùng
+// Admin xem danh sách TẤT CẢ người dùng
 exports.getAllUsers = async (req, res) => {
     try {
         const users = await User.find({}).select('-password_hash'); 
@@ -68,7 +68,7 @@ exports.getAllUsers = async (req, res) => {
     }
 };
 
-// [2] Admin xem đơn hàng theo User ID
+// Admin xem đơn hàng theo User ID
 exports.getUserOrders = async (req, res) => {
     const { userId } = req.params;
     try {

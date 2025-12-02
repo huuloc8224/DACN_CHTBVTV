@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Font và reset */
 body {
   font-family: 'Inter', sans-serif;
   margin: 0;
@@ -10,7 +9,6 @@ body {
   box-sizing: border-box;
 }
 
-/* Animation trang chủ (nếu có dùng) */
 @keyframes bounce-slow {
   0%, 100% { transform: translateY(-5%); }
   50% { transform: translateY(5%); }
@@ -19,7 +17,6 @@ body {
   animation: bounce-slow 4s infinite ease-in-out;
 }
 
-/* ===== FIX MARKDOWN TRÀN KHUNG CHAT ===== */
 /* Đảm bảo nội dung chat không tràn khung */
 .markdown-content, .chat-message {
   word-wrap: break-word;

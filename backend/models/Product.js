@@ -8,11 +8,11 @@ const productSchema = new mongoose.Schema({
     stock_quantity: { type: Number, required: true, default: 0 },
     image_url: { type: String, default: '/images/placeholder.jpg' }, 
     
-    // [THÊM LẠI] Trường phân loại sản phẩm
+    //phân loại sản phẩm
     category: { 
         type: String, 
-        enum: ['thuoc', 'phan', 'thucan'], // Các giá trị cho phép
-        required: true, // Bắt buộc phải có
+        enum: ['thuoc', 'phan', 'thucan'],
+        required: true,
         default: 'thuoc'
     },
     

@@ -1,39 +1,39 @@
-// backend/routes/orderRoutes.js
+// routes/orderRoutes.js
 const express = require('express');
 const router = express.Router();
-const { 
-    createOrder, 
-    getOrdersByUser,
-    cancelOrder,
-    getAllOrders, 
-    updateOrderStatus, 
-    deleteOrder,
-    getOrderById,
-    // [MỚI] Import các hàm thống kê
-    getSalesStatistics,
-    getTopCustomers,
-    getOrdersByUserId
+
+const {
+  createOrder,
+  getMyOrders,
+  getOrderById,
+  getAllOrders,
+  updateOrderStatus,
+  deleteOrder,
+  getSalesStatistics,
+  getTopCustomers,
+  getTopProducts,
+  cancelOrder
 } = require('../controllers/orderController');
+
 const { protect, admin } = require('../middleware/authMiddleware');
 
-// === TUYẾN ĐƯỜNG CỦA USER ===
-router.route('/myorders').get(protect, getOrdersByUser);
-router.route('/cancel/:id').put(protect, cancelOrder);
-router.route('/').post(protect, createOrder);
+// USER
+router.post('/', protect, createOrder);
+router.get('/myorders', protect, getMyOrders);
+router.put('/cancel/:id', protect, cancelOrder);
 
-// === TUYẾN ĐƯỜNG CỦA ADMIN ===
+// ADMIN
+router.get('/admin', protect, admin, getAllOrders);
+router.put('/admin/:id/status', protect, admin, updateOrderStatus);
+router.delete('/admin/:id', protect, admin, deleteOrder);
 
-// [MỚI] THỐNG KÊ (Phải đặt trước /:id)
-router.route('/stats/sales').get(protect, admin, getSalesStatistics);
-router.route('/stats/top-customers').get(protect, admin, getTopCustomers);
-router.route('/user/:userId').get(protect, admin, getOrdersByUserId); // Lấy đơn hàng của 1 user
+// ADMIN STATS
+router.get('/admin/stats/sales', protect, admin, getSalesStatistics);
+router.get('/admin/stats/top-customers', protect, admin, getTopCustomers);
+router.get('/admin/stats/top-products', protect, admin, getTopProducts);
+router.put('/cancel/:id', protect, admin, cancelOrder);
 
-// Quản lý Đơn hàng
-router.route('/').get(protect, admin, getAllOrders); 
-router.put('/:id/status', protect, admin, updateOrderStatus);
-router.delete('/:id', protect, admin, deleteOrder);
-
-// === TUYẾN ĐƯỜNG CHUNG ===
-router.route('/:id').get(protect, getOrderById);
+// ORDER DETAIL (last)
+router.get('/:id', protect, getOrderById);
 
 module.exports = router;

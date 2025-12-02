@@ -10,7 +10,6 @@ const ContactPage = () => {
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Contact Details */}
         <div className="space-y-6">
           <div className="flex items-center p-4 bg-gray-50 rounded-lg">
             <Mail size={24} className="text-blue-500 mr-4" />
@@ -37,7 +36,6 @@ const ContactPage = () => {
           </div>
         </div>
 
-        {/* Location Map (Dummy) */}
         <div className="bg-gray-200 rounded-lg overflow-hidden">
           <MapPin size={32} className="mx-auto mt-10 text-gray-500"/>
           <p className="p-4 text-center text-gray-600">

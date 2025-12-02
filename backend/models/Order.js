@@ -1,24 +1,29 @@
-// backend/models/Order.js
 const mongoose = require('mongoose');
 
-const OrderItemSchema = new mongoose.Schema({
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    name: { type: String, required: true },
-    quantity: { type: Number, required: true, min: 1 },
-    unitPrice: { type: Number, required: true }
+const orderSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+  orderItems: [
+    {
+      name: { type: String, required: true },
+      quantity: { type: Number, required: true },
+      image_url: { type: String },
+      unitPrice: { type: Number, required: true },
+      productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    }
+  ],
+  shippingAddress: { type: String, required: true },
+  recipientName: { type: String, required: true },
+  phoneNumber: { type: String, required: true },
+  note: { type: String },
+  paymentMethod: { type: String, required: true },
+  itemsPrice: { type: Number, required: true },
+  shippingPrice: { type: Number, required: true, default: 0 },
+  taxPrice: { type: Number, required: true, default: 0 },
+  totalAmount: { type: Number, required: true },
+  status: { type: String, default: 'Pending' },
+  isPaid: { type: Boolean, default: false },
+  paidAt: { type: Date },
+  createdAt: { type: Date, default: Date.now }
 });
 
-const OrderSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    orderDate: { type: Date, default: Date.now },
-    totalAmount: { type: Number, required: true },
-    status: { type: String, enum: ['Pending', 'Shipped', 'Delivered', 'Cancelled'], default: 'Pending' },
-    shippingAddress: { type: String, required: true },
-    // TRƯỜNG MỚI
-    phoneNumber: { type: String, required: true, maxlength: 15 }, 
-    paymentMethod: { type: String, enum: ['COD', 'BankTransfer'], required: true },
-    // END TRƯỜNG MỚI
-    orderItems: [OrderItemSchema]
-}, { timestamps: true });
-
-module.exports = mongoose.model('Order', OrderSchema);
+module.exports = mongoose.model('Order', orderSchema);

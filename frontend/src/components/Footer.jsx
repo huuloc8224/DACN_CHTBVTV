@@ -1,4 +1,4 @@
-// frontend/src/components/Footer.jsx
+
 import React from 'react';
 import { MapPin, Phone, Mail } from 'lucide-react';
 
@@ -6,16 +6,15 @@ const Footer = () => {
     return (
         <footer className="bg-gray-800 text-gray-300 mt-12 shadow-inner">
             <div className="container mx-auto p-8 grid grid-cols-1 md:grid-cols-4 gap-8">
-                {/* Contact Info */}
                 <div>
                     <h3 className="text-xl font-bold text-white mb-4">Liên hệ</h3>
                     <p className="flex items-start mb-2">
                         <MapPin size={20} className="mr-3 mt-1 text-green-400 flex-shrink-0" />
-                        <span>Trường Đại học Trà Vinh (TVU), Khoa Nông nghiệp</span>
+                        <span>Huỳnh Hữu Lộc</span>
                     </p>
                     <p className="flex items-center mb-2">
                         <Phone size={20} className="mr-3 text-green-400" />
-                        <span>0294 382 2253</span>
+                        <span>0378460874</span>
                     </p>
                     <p className="flex items-center">
                         <Mail size={20} className="mr-3 text-green-400" />
@@ -23,7 +22,6 @@ const Footer = () => {
                     </p>
                 </div>
                 
-                {/* Quick Links */}
                 <div>
                     <h3 className="text-xl font-bold text-white mb-4">Điều hướng</h3>
                     <ul className="space-y-2">
@@ -33,8 +31,7 @@ const Footer = () => {
                         <li><a href="#" className="hover:text-white transition">Chính sách bảo mật</a></li>
                     </ul>
                 </div>
-                
-                {/* Newsletter (Dummy) */}
+
                 <div className="md:col-span-2">
                     <h3 className="text-xl font-bold text-white mb-4">Nhận thông tin</h3>
                     <p className="text-sm mb-4">Đăng ký để nhận các thông tin mới nhất về sâu bệnh và thuốc đặc trị.</p>

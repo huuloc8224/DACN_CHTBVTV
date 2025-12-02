@@ -1,141 +1,241 @@
 // frontend/src/pages/MyOrdersPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Link, useNavigate } from 'react-router-dom'; // Import Link
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Package, XCircle, RefreshCcw, Loader, Eye } from 'lucide-react'; // Import Eye
+import { Package, Eye, XCircle, Loader, RefreshCw, AlertCircle } from 'lucide-react';
 
-// Hàm helper (Nếu bạn chưa có, hãy thêm vào đầu file)
 const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
     });
 };
+
 const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
 
+const STATUS_TABS = [
+    { key: 'all',        label: 'Tất cả',          count: 0 },
+    { key: 'Pending',    label: 'Chờ xử lý',       color: 'yellow' },
+    { key: 'Shipped',    label: 'Đã giao vận chuyển', color: 'purple' },
+    { key: 'Delivered',  label: 'Đã giao hàng',    color: 'green' },
+    { key: 'Cancelled',  label: 'Đã hủy',          color: 'red' },
+];
+
+const getStatusInfo = (status) => {
+    const map = {
+        Pending:    { label: 'Chờ xử lý',       color: 'yellow' },
+        Shipped:    { label: 'Đã giao vận chuyển', color: 'purple' },
+        Delivered:  { label: 'Đã giao hàng',    color: 'green' },
+        Cancelled:  { label: 'Đã hủy',          color: 'red' },
+    };
+    return map[status] || { label: status, color: 'gray' };
+};
 
 const MyOrdersPage = () => {
     const { user, loading: authLoading } = useAuth();
     const navigate = useNavigate();
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [statusMessage, setStatusMessage] = useState('');
 
-    const fetchMyOrders = async () => {
-        setLoading(true);
-        setError('');
+    const [orders, setOrders] = useState([]);
+    const [filteredOrders, setFilteredOrders] = useState([]);
+    const [activeTab, setActiveTab] = useState('all');
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [message, setMessage] = useState({ text: '', type: '' });
+
+    const fetchOrders = async () => {
+        setRefreshing(true);
         try {
             const res = await api.get('/orders/myorders');
-            setOrders(res.data);
+            const data = res.data || [];
+            setOrders(data);
+            filterOrders(data, activeTab);
+            setMessage({ text: '', type: '' });
         } catch (err) {
-            setError('Không thể tải lịch sử đơn hàng. Vui lòng thử lại.');
-            console.error(err);
+            setMessage({ text: 'Không tải được đơn hàng.', type: 'error' });
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
+    };
+
+    const filterOrders = (orderList, tab) => {
+        if (tab === 'all') {
+            setFilteredOrders(orderList);
+        } else {
+            setFilteredOrders(orderList.filter(o => o.status === tab));
+        }
+        setActiveTab(tab);
     };
 
     useEffect(() => {
-        if (!authLoading && user) {
-            fetchMyOrders();
-        } else if (!authLoading && !user) {
-            navigate('/login');
-        }
+        if (!authLoading && user) fetchOrders();
+        else if (!authLoading && !user) navigate('/login');
     }, [authLoading, user, navigate]);
 
-
     const handleCancelOrder = async (orderId) => {
-        const orderToCancel = orders.find(o => o._id === orderId);
-        if (!orderToCancel || orderToCancel.status !== 'Pending') {
-            setStatusMessage('Chỉ được phép hủy đơn hàng đang ở trạng thái "Pending".');
+        const order = orders.find(o => o._id === orderId);
+        if (order.status !== 'Pending') {
+            setMessage({ text: 'Chỉ hủy được đơn hàng đang "Chờ xử lý".', type: 'error' });
             return;
         }
+        if (!window.confirm(`Hủy đơn hàng ${orderId.slice(-8).toUpperCase()}?`)) return;
 
-        if (window.confirm(`XÁC NHẬN HỦY: Bạn có chắc chắn muốn hủy đơn hàng ${orderId.substring(0, 8)}...?`)) {
-            try {
-                const res = await api.put(`/orders/cancel/${orderId}`);
-                setStatusMessage(`Đơn hàng ${orderId.substring(0, 8)}... đã được hủy thành công!`);
-                fetchMyOrders(); 
-            } catch (err) {
-                setStatusMessage(`Lỗi hủy đơn: ${err.response?.data?.message || 'Lỗi kết nối.'}`);
-            }
+        try {
+            await api.put(`/orders/cancel/${orderId}`);
+            setMessage({ text: 'Hủy đơn hàng thành công!', type: 'success' });
+            fetchOrders();
+        } catch (err) {
+            setMessage({ text: err.response?.data?.message || 'Hủy thất bại!', type: 'error' });
         }
     };
 
-    if (authLoading || loading) return (
-        <div className="text-center p-10 flex items-center justify-center text-xl text-gray-500">
-            <Loader size={24} className="animate-spin mr-2"/>Đang tải đơn hàng...
-        </div>
-    );
+    // Tính số lượng từng trạng thái
+    const stats = orders.reduce((acc, order) => {
+        acc[order.status] = (acc[order.status] || 0) + 1;
+        acc.all = orders.length;
+        return acc;
+    }, { all: orders.length });
+
+    if (authLoading || loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <Loader size={48} className="animate-spin text-green-600 mx-auto mb-4" />
+                    <p className="text-xl text-gray-600">Đang tải đơn hàng...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="max-w-6xl mx-auto p-4 space-y-6">
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-                <Package size={28} className="mr-3"/> Lịch Sử Mua Hàng Của Tôi
-            </h1>
-            
-            {statusMessage && (
-                <div className="p-3 bg-blue-100 text-blue-700 rounded-lg">{statusMessage}</div>
-            )}
-            {error && <div className="p-3 bg-red-100 text-red-700 rounded-lg">{error}</div>}
+        <div className="min-h-screen bg-gray-50 py-8 px-4">
+            <div className="max-w-7xl mx-auto">
 
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-                <table className="min-w-full text-sm">
-                    <thead className="bg-gray-100 border-b">
-                        <tr>
-                            <th className="py-3 px-4 text-left">ID Đơn hàng</th>
-                            <th className="py-3 px-4 text-left">Ngày đặt</th> {/* [MỚI] Thêm cột Ngày đặt */}
-                            <th className="py-3 px-4 text-left">Tổng tiền</th>
-                            <th className="py-3 px-4 text-left">Trạng thái</th>
-                            <th className="py-3 px-4 text-center">Chi tiết</th>
-                            <th className="py-3 px-4 text-center">Hủy đơn</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {orders.length === 0 ? (
-                            <tr><td colSpan="6" className="py-4 text-center text-gray-500">Bạn chưa có đơn hàng nào.</td></tr>
-                        ) : (
-                            orders.map((order) => (
-                                <tr key={order._id} className="border-b hover:bg-gray-50">
-                                    <td className="py-3 px-4">{order._id.substring(0, 8)}...</td>
-                                    {/* [MỚI] Hiển thị orderDate (hoặc createdAt) */}
-                                    <td className="py-3 px-4">{formatDate(order.orderDate || order.createdAt)}</td>
-                                    <td className="py-3 px-4 font-semibold">{formatCurrency(order.totalAmount)}</td>
-                                    <td className="py-3 px-4">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                            order.status === 'Delivered' ? 'bg-green-200 text-green-800' :
-                                            order.status === 'Cancelled' ? 'bg-red-200 text-red-800' : 
-                                            order.status === 'Shipped' ? 'bg-blue-200 text-blue-800' : 'bg-yellow-200 text-yellow-800'
-                                        }`}>
-                                            {order.status}
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+                    <h1 className="text-4xl font-extrabold text-gray-800 flex items-center gap-3">
+                        <Package size={40} className="text-green-600" />
+                        Lịch Sử Mua Hàng
+                    </h1>
+                    <button
+                        onClick={fetchOrders}
+                        disabled={refreshing}
+                        className="flex items-center gap-2 px-5 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition shadow-lg"
+                    >
+                        <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+                        Làm mới
+                    </button>
+                </div>
+
+                {/* THÊM SLIDEBAR FILTER TRẠNG THÁI – SIÊU ĐẸP */}
+                <div className="mb-8 overflow-x-auto">
+                    <div className="flex gap-3 pb-2 min-w-max">
+                        {STATUS_TABS.map(tab => {
+                            const count = stats[tab.key] || 0;
+                            const isActive = activeTab === tab.key;
+                            return (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => filterOrders(orders, tab.key)}
+                                    className={`relative px-6 py-4 rounded-xl font-semibold transition-all shadow-md whitespace-nowrap
+                                        ${isActive 
+                                            ? 'bg-green-600 text-white scale-105 shadow-xl' 
+                                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                                        }`}
+                                >
+                                    {tab.label}
+                                    {count > 0 && (
+                                        <span className={`ml-2 px-2.5 py-0.5 rounded-full text-xs font-bold
+                                            ${isActive ? 'bg-white text-green-600' : 'bg-gray-200 text-gray-700'}`}
+                                        >
+                                            {count}
                                         </span>
-                                    </td>
-                                    <td className="py-3 px-4 text-center">
-                                        <Link 
-                                            to={`/order/${order._id}`} 
-                                            className="text-blue-600 hover:text-blue-800"
-                                            title="Xem chi tiết"
-                                        >
-                                            <Eye size={18} className="inline"/>
-                                        </Link>
-                                    </td>
-                                    <td className="py-3 px-4 text-center">
-                                        <button 
-                                            onClick={() => handleCancelOrder(order._id)}
-                                            disabled={order.status !== 'Pending'}
-                                            className={`text-red-500 hover:text-red-700 transition font-medium text-sm ${order.status !== 'Pending' ? 'opacity-30 cursor-not-allowed' : ''}`}
-                                        >
-                                            <XCircle size={18} className="inline"/>
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Thông báo */}
+                {message.text && (
+                    <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 shadow-md ${
+                        message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                        <AlertCircle size={24} />
+                        <span className="font-medium">{message.text}</span>
+                    </div>
+                )}
+
+                {/* Bảng đơn hàng */}
+                <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+                    {filteredOrders.length === 0 ? (
+                        <div className="text-center py-20">
+                            <Package size={80} className="mx-auto text-gray-300 mb-4" />
+                            <p className="text-xl text-gray-500">
+                                {activeTab === 'all' ? 'Bạn chưa có đơn hàng nào' : `Không có đơn hàng ${STATUS_TABS.find(t => t.key === activeTab)?.label.toLowerCase()}`}
+                            </p>
+                            {activeTab === 'all' && (
+                                <Link to="/products" className="mt-6 inline-block px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold">
+                                    Tiếp tục mua sắm
+                                </Link>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+                                    <tr>
+                                        <th className="py-5 px-6 text-left font-semibold">Mã đơn</th>
+                                        <th className="py-5 px-6 text-left font-semibold">Ngày đặt</th>
+                                        <th className="py-5 px-6 text-left font-semibold">Tổng tiền</th>
+                                        <th className="py-5 px-6 text-left font-semibold">Trạng thái</th>
+                                        <th className="py-5 px-6 text-center font-semibold">Chi tiết</th>
+                                        <th className="py-5 px-6 text-center font-semibold">Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {filteredOrders.map((order) => {
+                                        const statusInfo = getStatusInfo(order.status);
+                                        return (
+                                            <tr key={order._id} className="hover:bg-gray-50 transition">
+                                                <td className="py-5 px-6 font-mono text-sm">{order._id.slice(-8).toUpperCase()}</td>
+                                                <td className="py-5 px-6 text-gray-600">{formatDate(order.orderDate || order.createdAt)}</td>
+                                                <td className="py-5 px-6 font-bold text-green-600 text-lg">{formatCurrency(order.totalAmount)}</td>
+                                                <td className="py-5 px-6">
+                                                    <span className={`px-4 py-2 rounded-full text-xs font-bold bg-${statusInfo.color}-100 text-${statusInfo.color}-800`}>
+                                                        {statusInfo.label}
+                                                    </span>
+                                                </td>
+                                                <td className="py-5 px-6 text-center">
+                                                    <Link to={`/order/${order._id}`} className="text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-2">
+                                                        <Eye size={20} /> Xem
+                                                    </Link>
+                                                </td>
+                                                <td className="py-5 px-6 text-center">
+                                                    {order.status === 'Pending' ? (
+                                                        <button onClick={() => handleCancelOrder(order._id)} className="text-red-600 hover:text-red-800 font-medium flex items-center gap-2 mx-auto">
+                                                            <XCircle size={20} /> Hủy đơn
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-gray-400">—</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

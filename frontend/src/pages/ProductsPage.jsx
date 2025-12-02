@@ -2,179 +2,240 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import ProductCard from '../components/ProductCard';
-import { RefreshCcw, Filter, Package, Search, Loader, ChevronsUpDown } from 'lucide-react'; // Thêm icon Sắp xếp
-
-// Tùy chọn lọc Phân loại
+import { Search, Filter, Package, Loader, X, Leaf } from 'lucide-react';
+import { Link } from "react-router-dom";
 const CATEGORY_OPTIONS = [
-    { value: '', label: 'Tất cả Phân loại' }, 
-    { value: 'thuoc', label: 'Thuốc BVTV' },
-    { value: 'phan', label: 'Phân Bón' },
-    { value: 'thucan', label: 'Thức Ăn' }
+  { value: '', label: 'Tất cả Phân loại' },
+  { value: 'thuoc', label: 'Thuốc BVTV' },
+  { value: 'phan', label: 'Phân Bón' },
+  { value: 'thucan', label: 'Thức Ăn Chăn Nuôi' }
 ];
 
-// [MỚI] Tùy chọn Sắp xếp
 const SORT_OPTIONS = [
-    { value: 'name-asc', label: 'Mặc định (Tên A-Z)' },
-    { value: 'price-asc', label: 'Giá Thấp đến Cao' },
-    { value: 'price-desc', label: 'Giá Cao đến Thấp' }
+  { value: 'name-asc', label: 'Tên A → Z' },
+  { value: 'price-asc', label: 'Giá: Thấp → Cao' },
+  { value: 'price-desc', label: 'Giá: Cao → Thấp' },
+  { value: 'newest', label: 'Mới nhất' }
 ];
 
 const ProductsPage = () => {
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    // States cho bộ lọc
-    const [category, setCategory] = useState('');
-    const [search, setSearch] = useState(''); 
-    const [searchTerm, setSearchTerm] = useState('');
-    const [activeIngredient, setActiveIngredient] = useState(''); 
-    const [activeIngredientTerm, setActiveIngredientTerm] = useState('');
-    
-    // [MỚI] State cho Sắp xếp
-    const [sort, setSort] = useState('name-asc'); 
+  const [category, setCategory] = useState('');
+  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeIngredient, setActiveIngredient] = useState('');
+  const [activeIngredientTerm, setActiveIngredientTerm] = useState('');
+  const [sort, setSort] = useState('name-asc');
 
-    const fetchProducts = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            // [SỬA LẠI] Gửi tất cả tham số filter/sort lên Backend
-            const res = await api.get('/products', {
-                params: {
-                    category: category || undefined, 
-                    search: searchTerm || undefined,
-                    active_ingredient: activeIngredientTerm || undefined,
-                    sort: sort // [MỚI] Gửi tham số sort
-                }
-            });
-            setProducts(res.data);
-        } catch (error) {
-            console.error("Error fetching products:", error);
-            setError("Không thể tải sản phẩm. Đảm bảo Backend đang chạy.");
-        } finally {
-            setLoading(false);
-        }
-    };
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (category) params.append('category', category);
+      if (searchTerm) params.append('search', searchTerm);
+      if (activeIngredientTerm) params.append('active_ingredient', activeIngredientTerm);
+      if (sort) params.append('sort', sort);
 
-    // [SỬA LẠI] Dùng useEffect để tự động gọi API khi filter/sort thay đổi
-    useEffect(() => {
-        fetchProducts();
-    }, [category, searchTerm, activeIngredientTerm, sort]); // [MỚI] Thêm 'sort'
+      const res = await api.get(`/products?${params.toString()}`);
+      setProducts(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Hàm xử lý khi nhấn nút tìm kiếm (cho cả 2 ô)
-    const handleSearchSubmit = (e) => {
-        e.preventDefault();
-        setSearchTerm(search); 
-        setActiveIngredientTerm(activeIngredient); 
-    };
+  useEffect(() => {
+    fetchProducts();
+  }, [category, searchTerm, activeIngredientTerm, sort]);
 
-    // Hàm xử lý khi nhấn nút Tải lại (Reset bộ lọc)
-    const handleResetFilters = () => {
-        setCategory('');
-        setSearch('');
-        setSearchTerm('');
-        setActiveIngredient('');
-        setActiveIngredientTerm('');
-        setSort('name-asc'); // [MỚI] Reset sort
-    };
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setSearchTerm(search.trim());
+    setActiveIngredientTerm(activeIngredient.trim());
+  };
 
-    return (
-        <div className="flex gap-3">
+  const handleReset = () => {
+    setCategory('');
+    setSearch('');
+    setSearchTerm('');
+    setActiveIngredient('');
+    setActiveIngredientTerm('');
+    setSort('name-asc');
+  };
 
-            {/* Sidebar Filter */}
-            <div className="w-[225px] bg-white p-4 rounded-xl shadow-md h-fit sticky top-20 border border-gray-100">
-    {/* Bộ lọc */}
-                <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center"><Filter size={20} className="mr-2"/> Bộ lọc</h2>
-                
-                {/* Search Form */}
-                <form onSubmit={handleSearchSubmit} className="space-y-4 mb-4">
-                    {/* ... (Search by Name) ... */}
-                    <div>
-                        <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">Tìm theo tên</label>
-                        <input
-                            type="text" id="search" value={search} onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Tìm tên sản phẩm"
-                            className="w-full p-2 border rounded-lg focus:outline-green-500"
-                        />
-                    </div>
-                    
-                    {/* ... (Search by Active Ingredient) ... */}
-                    <div>
-                        <label htmlFor="activeIngredient" className="block text-sm font-medium text-gray-700 mb-1">Tìm theo hoạt chất</label>
-                        <input
-                            type="text" id="activeIngredient" value={activeIngredient} onChange={(e) => setActiveIngredient(e.target.value)}
-                            placeholder="Tìm hoạt chất"
-                            className="w-full p-2 border rounded-lg focus:outline-green-500"
-                        />
-                    </div>
+  const hasFilter = category || searchTerm || activeIngredientTerm;
 
-                    <button type="submit" className="w-full bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 flex items-center justify-center">
-                        <Search size={20} className="mr-1"/> Tìm kiếm
+  return (
+    <>
+
+
+      {/* 2 VÙNG CUỘN RIÊNG BIỆT */}
+      <div className="bg-gray-50 py-1">
+        <div className="max-w-screen-2xl mx-auto px-1">
+
+          {/* HEIGHT CỐ ĐỊNH ĐỂ CUỘN */}
+          <div className="flex gap-8 h-[calc(100vh-160px)]">
+
+            {/* BỘ LỌC CUỘN RIÊNG */}
+            <aside className="hidden lg:block w-80 flex-shrink-0 overflow-y-auto pr-1">
+              <div className="bg-white rounded-2xl shadow-xl p-6 border">
+
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-3">
+                    <Filter className="text-green-600" size={28} />
+                    Bộ Lọc Tìm Kiếm
+                  </h2>
+                  {hasFilter && (
+                    <button onClick={handleReset} className="text-red-600 hover:text-red-700 font-medium text-sm">
+                      Xóa tất cả
                     </button>
+                  )}
+                </div>
+
+                <form onSubmit={handleSearch} className="space-y-6">
+                  
+                  {/* Tên sản phẩm */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Tên sản phẩm</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Nhập tên thuốc, phân bón..."
+                        className="w-full pl-12 pr-10 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                      />
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={22} />
+                      {search && (
+                        <button type="button" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <X className="text-gray-500 hover:text-gray-700" size={20} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Hoạt chất */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Hoạt chất chính</label>
+                    <input
+                      type="text"
+                      value={activeIngredient}
+                      onChange={(e) => setActiveIngredient(e.target.value)}
+                      placeholder="VD: Abamectin, Glyphosate..."
+                      className="w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 transition"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-4 rounded-xl transition shadow-lg text-lg flex items-center justify-center gap-3"
+                  >
+                    <Search size={24} />
+                    Tìm Kiếm Ngay
+                  </button>
                 </form>
 
-                {/* Category Filter */}
-                <div className="mb-4">
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">Phân loại</label>
-                    <select 
-                        name="category" id="category" value={category} onChange={(e) => setCategory(e.target.value)} 
-                        className="w-full p-3 border rounded-lg mt-1"
-                    >
-                        {CATEGORY_OPTIONS.map(cat => (
-                            <option key={cat.value} value={cat.value}>{cat.label}</option>
-                        ))}
-                    </select>
+                <hr className="my-8 border-gray-200" />
+
+                {/* Phân loại */}
+                <div>
+                  <h3 className="font-bold text-lg mb-4">Phân loại sản phẩm</h3>
+                  <div className="space-y-3">
+                    {CATEGORY_OPTIONS.map((cat) => (
+                      <label
+                        key={cat.value}
+                        className={`flex items-center p-4 rounded-xl cursor-pointer transition-all border-2 ${
+                          category === cat.value
+                            ? 'bg-green-50 border-green-500 text-green-700 font-bold'
+                            : 'border-transparent hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="category"
+                          value={cat.value}
+                          checked={category === cat.value}
+                          onChange={(e) => setCategory(e.target.value)}
+                          className="mr-4 text-green-600"
+                        />
+                        {cat.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                
-                {/* [MỚI] Sort Filter */}
-                <div className="mb-4">
-                    <label htmlFor="sort" className="block text-sm font-medium text-gray-700 mb-1">Sắp xếp theo</label>
-                    <select 
-                        name="sort" 
-                        id="sort" 
-                        value={sort} 
-                        onChange={(e) => setSort(e.target.value)} // Cập nhật state sort
-                        className="w-full p-3 border rounded-lg mt-1"
-                    >
-                        {SORT_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
+
+                <hr className="my-8 border-gray-200" />
+
+                {/* Sắp xếp */}
+                <div>
+                  <h3 className="font-bold text-lg mb-4">Sắp xếp theo</h3>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                    className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    {SORT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                
-                <button onClick={handleResetFilters} disabled={loading} className="flex items-center justify-center w-full text-sm bg-gray-200 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-300 transition">
-                    <RefreshCcw size={16} className={`mr-1 ${loading ? 'animate-spin' : ''}`} /> Xóa bộ lọc
-                </button>
+
+              </div>
+            </aside>
+
+            {/* DANH SÁCH SẢN PHẨM CUỘN RIÊNG */}
+            <div className="flex-1 overflow-y-auto pr-2">
+                {/* HEADER */}
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 flex items-center justify-center gap-4 tracking-tight">
+                    <Leaf className="w-10 h-10 md:w-12 md:h-12 text-green-600" />
+                    Danh Mục Sản Phẩm
+                </h2>
+              {hasFilter && (
+                <div className="bg-blue-50 border border-blue-300 rounded-xl p-5 mb-8 text-blue-800 font-medium flex justify-between items-center">
+                  <span>
+                    Tìm thấy <strong>{products.length}</strong> sản phẩm
+                  </span>
+                  <button onClick={handleReset} className="text-blue-600 hover:underline">
+                    Xóa bộ lọc
+                  </button>
+                </div>
+              )}
+
+              {loading ? (
+                <div className="text-center py-32">
+                  <Loader className="animate-spin text-green-600 mx-auto mb-6" size={64} />
+                  <p className="text-xl text-gray-600">Đang tải sản phẩm...</p>
+                </div>
+              ) : products.length === 0 ? (
+                <div className="text-center py-32 bg-white rounded-2xl shadow-xl">
+                  <Package className="mx-auto text-gray-300 mb-6" size={120} />
+                  <h3 className="text-3xl font-bold text-gray-700 mb-3">Không tìm thấy sản phẩm</h3>
+                  <p className="text-gray-500 text-lg">Thử thay đổi từ khóa hoặc bộ lọc</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-6">
+
+
+                  {products.map((product) => (
+                    <Link key={product._id} to={`/products/${product._id}`}>
+                      <ProductCard product={product} />
+                    </Link>
+                  ))}
+                </div>
+              )}
+
             </div>
-            
-            {/* Product List */}
-            <div className="flex-1">
-                {/* ... (H1) ... */}
 
-                <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                    <Package size={22} className="mr-2 text-green-600" /> Danh sách sản phẩm
-                </h1>
-
-                {error && <div className="p-4 bg-red-100 text-red-700 rounded-lg">{error}</div>}
-
-                {loading ? (
-                    <div className="text-center p-10 text-lg text-gray-500 flex items-center justify-center">
-                        <Loader size={24} className="animate-spin mr-2"/> Đang tải sản phẩm...
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {products.length > 0 ? (
-                            products.map(product => (
-                                <ProductCard key={product._id} product={product} />
-                            ))
-                        ) : (
-                            <p className="col-span-3 text-center text-xl text-gray-500 mt-10">Không tìm thấy sản phẩm nào khớp với bộ lọc.</p>
-                        )}
-                    </div>
-                )}
-            </div>
+          </div>
         </div>
-    );
+      </div>
+    </>
+  );
 };
 
 export default ProductsPage;

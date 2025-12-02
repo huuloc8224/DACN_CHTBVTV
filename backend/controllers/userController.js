@@ -1,9 +1,6 @@
-// backend/controllers/userController.js
+
 const User = require('../models/User');
 
-// @desc    Lấy tất cả địa chỉ của user
-// @route   GET /api/users/addresses
-// @access  Private
 exports.getUserAddresses = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -16,9 +13,6 @@ exports.getUserAddresses = async (req, res) => {
     }
 };
 
-// @desc    Thêm địa chỉ mới
-// @route   POST /api/users/addresses
-// @access  Private
 exports.addAddress = async (req, res) => {
     const { recipientName, phoneNumber, addressLine } = req.body;
 
@@ -41,7 +35,7 @@ exports.addAddress = async (req, res) => {
         user.addresses.push(newAddress); // Thêm địa chỉ mới vào mảng
         await user.save();
         
-        // Trả về địa chỉ vừa tạo (có thể chứa _id)
+        // Trả về địa chỉ vừa tạo
         res.status(201).json(user.addresses[user.addresses.length - 1]); 
     } catch (error) {
         res.status(500).json({ message: 'Lỗi server: ' + error.message });

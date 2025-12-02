@@ -1,4 +1,4 @@
-// frontend/src/context/AuthContext.jsx
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -24,8 +24,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const response = await api.post('/auth/login', { email, password });
             const { token, ...userData } = response.data;
-            
-            // Save token and user data
+        
             localStorage.setItem('token', token);
             localStorage.setItem('user_data', JSON.stringify(userData));
             setUser(userData);

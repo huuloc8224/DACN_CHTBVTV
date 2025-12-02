@@ -1,15 +1,14 @@
-// backend/controllers/productController.js
 const Product = require('../models/Product'); 
 const fs = require('fs/promises');
 const path = require('path'); 
 const { v4: uuidv4 } = require('uuid');
-// [SỬA LẠI] Controller lấy tất cả sản phẩm (Thêm logic Filter)
+//Controller lấy tất cả sản phẩm
 exports.getAllProducts = async (req, res) => {
     try {
-        // Lấy các tham số truy vấn (query params)
-        const { category, search, active_ingredient, sort } = req.query; // [MỚI] Thêm 'sort'
 
-        // 1. Xây dựng đối tượng Filter
+        const { category, search, active_ingredient, sort } = req.query;
+
+        // Xây dựng Filter
         const filter = {};
         if (category) {
             filter.category = category; 
@@ -21,12 +20,12 @@ exports.getAllProducts = async (req, res) => {
             filter.active_ingredient = { $regex: active_ingredient, $options: 'i' };
         }
 
-        // 2. [MỚI] Xây dựng đối tượng Sort
+        //Xây dựng Sort
         let sortOption = {};
         if (sort === 'price-asc') {
-            sortOption = { price: 1 }; // 1 = Tăng dần (Thấp đến Cao)
+            sortOption = { price: 1 }; // Tăng dầ
         } else if (sort === 'price-desc') {
-            sortOption = { price: -1 }; // -1 = Giảm dần (Cao đến Thấp)
+            sortOption = { price: -1 }; //Giảm dần
         } else {
             sortOption = { name: 1 }; // Mặc định sắp xếp theo tên A-Z
         }
@@ -44,7 +43,7 @@ exports.getAllProducts = async (req, res) => {
 
 
 
-// [SỬA LẠI] Hàm createProduct để nhận JSON (Base64)
+// Hàm createProduct để nhận JSON
 exports.createProduct = async (req, res) => {
     // Nhận dữ liệu JSON (đã thêm category và imageData)
     const { name, description, price, active_ingredient, stock_quantity, category, imageData } = req.body;
@@ -63,13 +62,11 @@ exports.createProduct = async (req, res) => {
             const buffer = Buffer.from(matches[2], 'base64');
             const ext = matches[1].includes('png') ? '.png' : (matches[1].includes('jpeg') ? '.jpeg' : '.jpg');
             
-            // [FIX] Dòng 51 (nơi gây lỗi) bây giờ đã hợp lệ
             const filename = `${name.replace(/ /g, '_')}-${uuidv4()}${ext}`; 
             const categoryFolder = category || 'general'; 
             const uploadDir = path.join(__dirname, '../public/uploads', categoryFolder);
             filePath = path.join(uploadDir, filename);
 
-            // [SỬA LỖI] (Dòng 58) Hàm này bây giờ là Promise và hợp lệ
             await fs.mkdir(uploadDir, { recursive: true });
             await fs.writeFile(filePath, buffer);
 
@@ -90,7 +87,7 @@ exports.createProduct = async (req, res) => {
         res.status(201).json(createdProduct);
 
     } catch (error) {
-        // [FIX] Xử lý lỗi trùng lặp (E11000)
+        //Xử lý lỗi trùng lặp
         if (error.code === 11000) {
             if (filePath) fs.unlink(filePath, () => {}); 
             return res.status(400).json({ message: 'Lỗi: Tên sản phẩm đã tồn tại.' });
@@ -101,14 +98,14 @@ exports.createProduct = async (req, res) => {
         res.status(400).json({ message: 'Lỗi tạo sản phẩm: ' + error.message });
     }
 };
-// [MỚI] HÀM CẬP NHẬT SẢN PHẨM (SỬA) - DÙNG BASE64
+//HÀM CẬP NHẬT SẢN PHẨM
 exports.updateProduct = async (req, res) => {
     const productId = req.params.id;
     const { name, description, price, active_ingredient, stock_quantity, category, imageData } = req.body;
 
-    let newImagePath = null; // Đường dẫn URL mới (nếu có)
-    let newFilePath = null; // Đường dẫn vật lý mới (để xóa nếu lỗi)
-    let oldFilePath = null; // Đường dẫn vật lý cũ (để xóa nếu thành công)
+    let newImagePath = null; // Đường dẫn URL mới
+    let newFilePath = null; // Đường dẫn vật lý mới
+    let oldFilePath = null; // Đường dẫn vật lý cũ
 
     try {
         const product = await Product.findById(productId);
@@ -116,9 +113,9 @@ exports.updateProduct = async (req, res) => {
             return res.status(404).json({ message: 'Không tìm thấy sản phẩm.' });
         }
 
-        // 1. Nếu có ảnh Base64 mới được gửi lên
+
         if (imageData && typeof imageData === 'string') {
-            // Lưu ảnh mới
+           
             const matches = imageData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
             if (!matches || matches.length < 3) {
                 return res.status(400).json({ message: 'Định dạng dữ liệu ảnh Base64 không hợp lệ.' });
@@ -135,7 +132,7 @@ exports.updateProduct = async (req, res) => {
             await fs.mkdir(uploadDir, { recursive: true });
             await fs.writeFile(newFilePath, buffer);
 
-            newImagePath = `/uploads/${categoryFolder}/${filename}`; // URL mới
+            newImagePath = `/uploads/${categoryFolder}/${filename}`;
             
             // Đánh dấu ảnh cũ để xóa
             if (product.image_url && !product.image_url.includes('placeholder.jpg')) {
@@ -143,7 +140,6 @@ exports.updateProduct = async (req, res) => {
             }
         }
 
-        // 2. Cập nhật các trường
         product.name = name || product.name;
         product.description = description || product.description;
         product.price = parseFloat(price) || product.price;
@@ -154,7 +150,7 @@ exports.updateProduct = async (req, res) => {
 
         const updatedProduct = await product.save();
         
-        // 3. Xóa ảnh cũ (nếu upload ảnh mới thành công)
+        //Xóa ảnh cũ (nếu upload ảnh mới thành công)
         if (oldFilePath) {
             await fs.unlink(oldFilePath).catch(err => console.error("Lỗi xóa ảnh cũ:", err));
         }
@@ -168,7 +164,7 @@ exports.updateProduct = async (req, res) => {
     }
 };
 
-// [MỚI] HÀM LẤY SẢN PHẨM THEO ID (Cần cho trang Chi tiết)
+//HÀM LẤY SẢN PHẨM THEO ID
 exports.getProductById = async (req, res) => {
 try {
         const product = await Product.findById(req.params.id);
@@ -183,7 +179,7 @@ try {
     }
 };
 
-// [MỚI] HÀM XÓA SẢN PHẨM (ADMIN)
+//HÀM XÓA SẢN PHẨM (ADMIN)
 exports.deleteProduct = async (req, res) => {
     const productId = req.params.id;
 
@@ -194,17 +190,17 @@ exports.deleteProduct = async (req, res) => {
             return res.status(404).json({ message: 'Không tìm thấy sản phẩm.' });
         }
 
-        // 1. Lấy đường dẫn ảnh để xóa file vật lý
+        //Lấy đường dẫn ảnh để xóa file vật lý
         const imageUrl = product.image_url;
         let oldFilePath = null;
         if (imageUrl && !imageUrl.includes('placeholder.jpg')) {
             oldFilePath = path.join(__dirname, '../public', imageUrl);
         }
 
-        // 2. Xóa sản phẩm khỏi MongoDB
+        //Xóa sản phẩm khỏi MongoDB
         await Product.findByIdAndDelete(productId);
 
-        // 3. Xóa file ảnh vật lý (sau khi đã xóa DB thành công)
+        //Xóa file ảnh vật lý (sau khi đã xóa DB thành công)
         if (oldFilePath) {
             await fs.unlink(oldFilePath).catch(err => console.error("Lỗi xóa file ảnh cũ:", err));
         }
