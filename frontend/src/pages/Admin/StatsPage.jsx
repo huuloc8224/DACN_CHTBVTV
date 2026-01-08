@@ -16,8 +16,8 @@ const StatsPage = () => {
   const [minSpend, setMinSpend] = useState(0);
 
   const [topProducts, setTopProducts] = useState([]);
-  const [topLimit, setTopLimit] = useState(10); // fixed default, selectable via dropdown
-  const [topBy, setTopBy] = useState('quantity'); // 'quantity' | 'revenue'
+  const [topLimit, setTopLimit] = useState(10);
+  const [topBy, setTopBy] = useState('quantity');
   const [loadingTopProducts, setLoadingTopProducts] = useState(false);
 
   const fetchStats = useCallback(async () => {

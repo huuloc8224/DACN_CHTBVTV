@@ -17,6 +17,7 @@
     "@langchain/community": "^0.0.51",
     "@langchain/core": "^0.1.63",
     "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
     "cors": "^2.8.5",
     "datauri": "^4.1.0",

@@ -4,13 +4,36 @@ import { Truck, Eye, Trash2, Loader2 as Loader } from 'lucide-react';
 import api from '../../services/api';
 import OrderDetailsModal from './Modals/OrderDetailsModal';
 
-const STATUS_OPTIONS = ['Pending', 'Shipped', 'Delivered', 'Cancelled'];
 const formatCurrency = (v) => `${Number(v || 0).toLocaleString('vi-VN')}₫`;
 const formatDate = (d) => {
   if (!d) return 'Chưa xác định';
   const date = new Date(d);
-  return isNaN(date) ? 'Lỗi ngày' : date.toLocaleDateString('vi-VN');
+  return isNaN(date.getTime()) ? 'Lỗi ngày' : date.toLocaleDateString('vi-VN');
 };
+
+// Bản dịch trạng thái sang tiếng Việt
+const STATUS_TRANSLATIONS = {
+  Pending: 'Chờ xử lý',
+  Shipped: 'Đang giao',
+  Delivered: 'Đã giao',
+  Cancelled: 'Đã hủy'
+};
+
+// Màu sắc badge cho từng trạng thái
+const STATUS_COLORS = {
+  Pending: 'bg-yellow-200 text-yellow-900',
+  Shipped: 'bg-blue-200 text-blue-900',
+  Delivered: 'bg-green-200 text-green-900',
+  Cancelled: 'bg-red-200 text-red-900'
+};
+
+// Dropdown options
+const STATUS_OPTIONS = [
+  { value: 'Pending', label: 'Chờ xử lý' },
+  { value: 'Shipped', label: 'Đang giao' },
+  { value: 'Delivered', label: 'Đã giao' },
+  { value: 'Cancelled', label: 'Đã hủy' }
+];
 
 const OrdersPage = () => {
   const [loading, setLoading] = useState(false);
@@ -24,26 +47,24 @@ const OrdersPage = () => {
   };
 
   const fetchOrders = useCallback(async () => {
-  setLoading(true);
-  try {
-    const res = await api.get('/orders/admin');
-    setOrders(res.data);
-  } catch (err) {
-    console.error('fetchOrders error full:', err);
-    console.error('err.response:', err.response);
-    console.error('err.response.data:', err.response?.data);
-    console.error('err.response.status:', err.response?.status);
-    showToast('error', err.response?.data?.message || 'Lỗi tải đơn hàng');
-  } finally {
-    setLoading(false);
-  }
-}, []);
+    setLoading(true);
+    try {
+      const res = await api.get('/orders/admin');
+      setOrders(res.data || []);
+    } catch (err) {
+      console.error('Lỗi tải đơn hàng:', err);
+      showToast('error', err.response?.data?.message || 'Lỗi tải đơn hàng');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const updateOrderStatus = async (orderId, status) => {
-    if (!confirm(`Đổi trạng thái thành "${status}"?`)) return;
+    if (!confirm(`Đổi trạng thái thành "${STATUS_TRANSLATIONS[status]}"?`)) return;
     try {
       await api.put(`/orders/admin/${orderId}/status`, { status });
       showToast('success', 'Cập nhật trạng thái thành công');
@@ -54,7 +75,7 @@ const OrdersPage = () => {
   };
 
   const deleteOrder = async (orderId) => {
-    if (!confirm('Xóa đơn hàng này vĩnh viễn?')) return;
+    if (!confirm('Xóa đơn hàng này vĩnh viễn? Không thể khôi phục!')) return;
     try {
       await api.delete(`/orders/admin/${orderId}`);
       showToast('success', 'Đã xóa đơn hàng');
@@ -65,82 +86,127 @@ const OrdersPage = () => {
   };
 
   return (
-    <div>
-      <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-        <Truck className="w-10 h-10 text-green-600" />
-        Quản lý đơn hàng ({orders.length})
-      </h2>
+    <div className="min-h-screen bg-gray-50">
+      <div className="w-full">
+        <div className="px-6 py-8">
+          <h2 className="text-4xl font-extrabold text-green-700 mb-8 flex items-center gap-4">
+            <Truck className="w-12 h-12 text-green-600" />
+            Quản lý đơn hàng
+            <span className="text-2xl text-gray-600">({orders.length} đơn)</span>
+          </h2>
+        </div>
 
-      <div className="overflow-x-auto rounded-xl shadow-lg border">
-        {loading ? (
-          <div className="py-12 flex items-center justify-center">
-            <Loader className="w-10 h-10 animate-spin text-green-600" />
+        <div className="w-full px-6">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+            {loading ? (
+              <div className="py-20 flex flex-col items-center justify-center">
+                <Loader className="w-16 h-16 animate-spin text-green-600 mb-4" />
+                <p className="text-xl text-gray-600">Đang tải danh sách đơn hàng...</p>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="py-20 text-center">
+                <Truck className="w-24 h-24 text-gray-300 mx-auto mb-6" />
+                <p className="text-xl text-gray-600">Chưa có đơn hàng nào</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-green-600 to-emerald-600 text-white">
+                    <tr>
+                      <th className="text-left p-6 font-bold">ID ĐƠN</th>
+                      <th className="text-left p-6 font-bold">NGÀY ĐẶT</th>
+                      <th className="text-left p-6 font-bold">KHÁCH HÀNG</th>
+                      <th className="text-right p-6 font-bold">TỔNG TIỀN</th>
+                      <th className="text-center p-6 font-bold">TRẠNG THÁI</th>
+                      <th className="text-center p-6 font-bold">THAO TÁC</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {orders.map((o) => (
+                      <tr key={o._id} className="hover:bg-green-50 transition">
+                        <td className="p-6 font-mono text-sm text-gray-600">
+                          {o._id.slice(-8).toUpperCase()}
+                        </td>
+                        <td className="p-6 text-gray-700">{formatDate(o.orderDate || o.createdAt)}</td>
+                        <td className="p-6 font-semibold text-gray-800">
+                          {o.userId?.name || o.recipientName || 'Khách lẻ'}
+                          <br />
+                          <span className="text-sm text-gray-500">{o.userId?.email || o.phoneNumber}</span>
+                        </td>
+                        <td className="p-6 text-right font-bold text-green-600 text-xl">
+                          {formatCurrency(o.totalAmount)}
+                        </td>
+                        <td className="p-6 text-center">
+                          <div className="relative inline-block">
+                            <div
+                              className={`px-6 py-3 rounded-full text-sm font-bold ${STATUS_COLORS[o.status] || 'bg-gray-200 text-gray-800'}`}
+                            >
+                              {STATUS_TRANSLATIONS[o.status] || o.status}
+                            </div>
+
+                            <select
+                              value={o.status}
+                              onChange={(e) => updateOrderStatus(o._id, e.target.value)}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            >
+                              {STATUS_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="p-6 text-center">
+                          {/* 2 nút cách nhau khoảng nhỏ đẹp (gap-3 thay vì space-y-3) */}
+                          <div className="flex items-center justify-center gap-3">
+                            <button
+                              onClick={() => setSelectedOrder(o)}
+                              className="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
+                              title="Xem chi tiết đơn hàng"
+                            >
+                              <Eye size={20} />
+                              Chi tiết
+                            </button>
+
+                            <button
+                              onClick={() => deleteOrder(o._id)}
+                              className="inline-flex items-center gap-2 px-5 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition shadow-md"
+                              title="Xóa đơn hàng"
+                            >
+                              <Trash2 size={20} />
+                              Xóa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="text-left p-4">ID</th>
-                <th className="text-left p-4">Ngày</th>
-                <th className="text-left p-4">Khách hàng</th>
-                <th className="text-right p-4">Tổng tiền</th>
-                <th className="text-center p-4">Trạng thái</th>
-                <th className="text-center p-4">Chi tiết</th>
-                <th className="text-center p-4">Hiển thị</th>
-                <th className="text-center p-4">Xóa</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map(o => (
-                <tr key={o._id} className="border-t hover:bg-gray-50">
-                  <td className="p-4 font-mono text-xs">{o._id.slice(-6)}</td>
-                  <td className="p-4">{formatDate(o.orderDate)}</td>
-                  <td className="p-4 font-medium">{o.userId?.name || o.userId?.email || 'Khách lẻ'}</td>
-                  <td className="p-4 text-right font-bold text-green-600">{formatCurrency(o.totalAmount)}</td>
-                  <td className="p-4 text-center">
-                    <select
-                      value={o.status}
-                      onChange={e => updateOrderStatus(o._id, e.target.value)}
-                      className="px-3 py-1 border rounded-lg text-sm"
-                    >
-                      {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </td>
-                  <td className="p-4 text-center">
-                    <button onClick={() => setSelectedOrder(o)} className="text-blue-600 hover:text-blue-800">
-                      <Eye className="w-5 h-5" />
-                    </button>
-                  </td>
-                  <td className="p-4 text-center">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      o.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                      o.status === 'Shipped' ? 'bg-blue-100 text-blue-800' :
-                      o.status === 'Cancelled' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {o.status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-center">
-                    <button onClick={() => deleteOrder(o._id)} className="text-red-600 hover:text-red-800">
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        </div>
+
+        {/* Modal chi tiết đơn hàng */}
+        {selectedOrder && (
+          <OrderDetailsModal
+            order={selectedOrder}
+            onClose={() => setSelectedOrder(null)}
+          />
+        )}
+
+        {/* Toast thông báo */}
+        {toast.show && (
+          <div
+            className={`fixed top-6 right-6 z-50 px-8 py-4 rounded-2xl text-white font-bold shadow-2xl transition-transform animate-pulse ${
+              toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+            }`}
+          >
+            {toast.message}
+          </div>
         )}
       </div>
-
-      {selectedOrder && (
-        <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
-      )}
-
-      {toast.show && (
-        <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-xl text-white font-bold shadow-2xl transition ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-          {toast.message}
-        </div>
-      )}
     </div>
   );
 };

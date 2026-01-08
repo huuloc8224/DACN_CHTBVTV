@@ -1,126 +1,230 @@
-// backend/controllers/chatController.js ← DÁN ĐÈ TOÀN BỘ – BẢN CUỐI CÙNG HOÀN HẢO NHẤT!
-require("dotenv").config();
-const KnowledgeBase = require("../models/KnowledgeBase");
-const mongoose = require("mongoose");
-mongoose.set("strictQuery", false);
+const ChatSession = require('../models/ChatSession');
+const KnowledgeBase = require('../models/KnowledgeBase');
+const Product = require('../models/Product');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const VN_STOPWORDS = new Set([
-  "la","bi","dang","bi","bi","cay","lua","dau","thay","co","bi","nhu","la","la","la",
-  "trieu","chung","cua","toi","nay","kia","do","va","ma","thi","la","o","tren","duoi",
-  "qua","noi","ke","noi","la","gi","chi","mot","nhieu","phan","khuc","cho"
-]);
+/*GEMINI */
+let gemini = null;
+if (process.env.GEMINI_API_KEY) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  gemini = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+}
 
-const normalize = (t) => {
-  return t.normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[.,!?;:“”'"()]/g, " ")
-    .toLowerCase()
-    .trim();
-};
-
-const extractKeywords = (text) => {
-  const cleaned = normalize(text);
-  const words = cleaned.split(/\s+/).filter(w => w.length >= 2 && !VN_STOPWORDS.has(w));
-  return [...new Set(words)];
-};
-
-const scoreDisease = (disease, keywords) => {
-  let score = 0;
-
-  const symp = Array.isArray(disease.symptoms)
-    ? disease.symptoms.join(" ").toLowerCase()
-    : String(disease.symptoms || "").toLowerCase();
-
-  const topic = String(disease.topic || "").toLowerCase();
-  const treat = String(disease.treatment_recommendations || "").toLowerCase();
-
-  keywords.forEach(k => {
-    const r = new RegExp(`\\b${k}\\b`, "i");
-    if (r.test(symp)) score += 3;
-    if (r.test(topic)) score += 2;
-    if (r.test(treat)) score += 1;
-  });
-
-  return score;
-};
-
-const searchBestDisease = async (keywords) => {
-  if (!keywords.length) return null;
-
-  const escaped = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const regex = new RegExp(escaped.join("|"), "i");
-
-  const candidates = await KnowledgeBase.find({
-    crop: "Lúa",
-    $or: [
-      { symptoms: { $elemMatch: { $regex: regex } } },
-      { topic: { $regex: regex } },
-      { treatment_recommendations: { $regex: regex } }
-    ]
-  });
-
-  if (!candidates.length) return null;
-
-  let best = null;
-  let maxScore = 0;
-
-  candidates.forEach(c => {
-    const s = scoreDisease(c, keywords);
-    if (s > maxScore) {
-      maxScore = s;
-      best = c;
-    }
-  });
-
-  if (maxScore === 0) return null;
-
-  return best;
-};
-
-exports.askChatbot = async (req, res) => {
+const askGemini = async (prompt) => {
+  if (!gemini) return null;
   try {
-    const { history } = req.body;
-    if (!history || !Array.isArray(history) || !history.length) {
-      return res.status(400).json({ answer: "Bà con hỏi gì bác nghe không rõ nghen!" });
-    }
+    const r = await gemini.generateContent(prompt);
+    return r?.response?.text() || null;
+  } catch {
+    return null;
+  }
+};
 
-    const last = [...history].reverse().find(m => m.role === "user");
-    const userText = last?.parts?.find(p => p.text)?.text || "";
+/*UTIL*/
+const normalize = (t = '') =>
+  t.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd');
 
-    if (history.length === 1 && /^(hi|hello|chao|alo|bac|bac oi)/i.test(normalize(userText))) {
+/*NHẬN DIỆN*/
+const isGreeting = (t) =>
+  /^(chao|chao bac|chao ba|xin chao|hello|hi|alo|bac oi|ba oi|chao a|chao anh|chao chi)$/i.test(t);
+
+const isSmallTalk = (t) =>
+  /(khoe khong|co khoe khong|met khong|an com chua|dang lam gi|hom nay sao roi|ruong dong sao roi)/i.test(t);
+
+const isWeatherQuestion = (t) =>
+  /(thoi tiet|du bao thoi tiet|nhiet do|troi mua|troi nang|co mua khong|ap thap|bao|gio manh|do am|ngay mai|hom nay troi|toi nay|sang mai)/i.test(t);
+
+/* match triệu chứng */
+const keywordMatch = (symptom, message) => {
+  const sWords = normalize(symptom).split(' ');
+  const mWords = normalize(message).split(' ');
+  return sWords.some(w => w.length >= 3 && mWords.includes(w));
+};
+
+/* match tên bệnh */
+const diseaseNameMatch = (name, message) => {
+  const dWords = normalize(name).split(' ');
+  const mWords = normalize(message).split(' ');
+  return dWords.some(w => w.length >= 3 && mWords.includes(w));
+};
+
+/*POST /api/chat/ask*/
+const chatController = async (req, res) => {
+  try {
+    const { userId, sessionId, message } = req.body;
+    if (!userId || !message) {
       return res.json({
-        answer:
-          "Chào bà con! Bác Ba Lúa đây. Cây có gì lạ gửi ảnh hoặc kể triệu chứng, bác chỉ bệnh liền nghen!\n\nChúc bà con mùa màng trúng mùa!"
+        answer: 'Bà con cứ nói tự nhiên, bác Ba Lúa đang nghe đây 🌾',
+        isDiagnosis: false
       });
     }
 
-    const keywords = extractKeywords(userText);
-
-    const disease = await searchBestDisease(keywords);
-
-    if (!disease) {
-      return res.json({
-        answer:
-          "Bác tra hết kho mà chưa thấy khớp bệnh nào rõ ràng. Bà con gửi thêm ảnh hoặc mô tả kỹ hơn nghen!\n\nChúc bà con mùa màng bội thu!"
+    /*SESSION*/
+    let session = sessionId ? await ChatSession.findById(sessionId) : null;
+    if (!session) {
+      session = await ChatSession.create({
+        userId,
+        title: 'Tư vấn mới',
+        messages: []
       });
     }
 
-    const answer =
-      `Ờ rồi, bác xem kỹ rồi, bệnh này đây:\n\n` +
-      `Bệnh: ${disease.topic}\n` +
-      `Triệu chứng: ${Array.isArray(disease.symptoms) ? disease.symptoms.join(", ") : disease.symptoms}\n` +
-      `Cách xử lý: ${disease.treatment_recommendations}\n` +
-      (Array.isArray(disease.active_ingredients) && disease.active_ingredients.length
-        ? `Hoạt chất: ${disease.active_ingredients.join(", ")}\n`
-        : "") +
-      `\nBà con xử lý sớm cho lúa khỏe, chắc hạt nghen!\n\nChúc bà con mùa màng thắng lớn!`;
+    session.messages.push({ role: 'user', text: message });
+    const normText = normalize(message);
 
-    res.json({ answer });
+
+    if (isWeatherQuestion(normText)) {
+      const reply =
+        (await askGemini(
+          `Bạn là Bác Ba Lúa, giọng miền Nam.
+Người dùng hỏi thời tiết: "${message}".
+Trả lời đúng câu hỏi, ngắn gọn, thân thiện.`
+        )) ||
+        'Bác chưa coi được thời tiết chỗ đó, bà con nói rõ địa điểm giúp bác nha.';
+
+      session.messages.push({ role: 'bot', text: reply });
+      await session.save();
+
+      return res.json({
+        sessionId: session._id.toString(),
+        answer: reply,
+        isDiagnosis: false
+      });
+    }
+
+    /*CHÀO HỎI*/
+    if (isGreeting(normText) || isSmallTalk(normText)) {
+      const reply =
+        (await askGemini(
+          `Bạn là Bác Ba Lúa, nói chuyện thân thiện, giọng miền Nam.
+Người dùng nói: "${message}"`
+        )) ||
+        'Dạ bác đang nghe đây, bà con cứ nói tiếp nha 🌾';
+
+      session.messages.push({ role: 'bot', text: reply });
+      await session.save();
+
+      return res.json({
+        sessionId: session._id.toString(),
+        answer: reply,
+        isDiagnosis: false
+      });
+    }
+
+    /*CHẨN ĐOÁN BỆNH*/
+    const kbList = await KnowledgeBase.find({})
+      .populate('recommendedProducts')
+      .lean();
+
+    let best = null;
+    let bestScore = 0;
+
+    for (const kb of kbList) {
+      let score = 0;
+
+      if (diseaseNameMatch(kb.diseaseName, message)) score += 5;
+
+      for (const s of kb.symptoms || []) {
+        if (keywordMatch(s, message)) score += 1;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = kb;
+      }
+    }
+
+    if (best && bestScore > 0) {
+      let products = [];
+
+      if (best.recommendedProducts?.length > 0) {
+        products = best.recommendedProducts;
+      } else {
+        products = await Product.find({
+          category: 'thuoc',
+          activeIngredients: { $in: best.activeIngredients || [] }
+        }).limit(5).lean();
+      }
+
+      const prompt = `
+        Bạn là Bác Ba Lúa, giọng miền Nam.
+        Viết ngắn gọn, dễ hiểu, chia đoạn rõ ràng.
+        Không dùng dấu sao.
+
+        Tên bệnh: ${best.diseaseName}
+        Triệu chứng: ${best.symptoms.slice(0, 3).join(', ')}
+        Hoạt chất: ${best.activeIngredients.join(', ')}
+        Hướng xử lý: ${best.treatmentGuide}
+        Phòng ngừa: ${best.prevention}
+      `;
+
+      const answer =
+        (await askGemini(prompt)) ||
+        `Theo mô tả, bác nghi lúa đang bị ${best.diseaseName}.
+
+        Triệu chứng thường thấy là ${best.symptoms.slice(0, 3).join(', ')}.
+
+        Bà con nên xử lý sớm bằng thuốc có hoạt chất ${best.activeIngredients.join(', ')}.
+
+        Giữ ruộng thông thoáng, hạn chế bón thừa đạm để bệnh mau dứt.`;
+
+      session.title = best.diseaseName;
+      session.disease = best.diseaseName;
+      session.suggestedProducts = products.map(p => p._id);
+      session.messages.push({ role: 'bot', text: answer });
+      await session.save();
+
+      return res.json({
+        sessionId: session._id.toString(),
+        answer,
+        disease: best.diseaseName,
+        products,
+        isDiagnosis: true
+      });
+    }
+
+    /*KHÔNG XÁC ĐỊNH*/
+    const notFound =
+      'Bác chưa bắt được bệnh rõ ràng. Bà con mô tả thêm giúp bác nha, ví dụ lá bị sao, màu gì, lan nhanh hông 🌱';
+
+    session.messages.push({ role: 'bot', text: notFound });
+    await session.save();
+
+    return res.json({
+      sessionId: session._id.toString(),
+      answer: notFound,
+      isDiagnosis: false
+    });
+
   } catch (err) {
-    console.error("Lỗi chatbot:", err.message);
-    res.status(500).json({
-      answer: "Ui mạng yếu quá, bà con gửi lại giúp bác nghen!"
+    console.error('CHAT ERROR:', err);
+    return res.json({
+      answer: 'Bác Ba Lúa hơi mệt 😅 bà con hỏi lại giúp bác nha!',
+      isDiagnosis: false
     });
   }
 };
+
+/*Lịch sử*/
+const getChatHistory = async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return res.json([]);
+
+    const sessions = await ChatSession.find({ userId })
+      .sort({ updatedAt: -1 })
+      .populate('suggestedProducts')
+      .lean();
+
+    return res.json(
+      sessions.map(s => ({ ...s, _id: s._id.toString() }))
+    );
+  } catch {
+    return res.json([]);
+  }
+};
+
+module.exports = { chatController, getChatHistory };

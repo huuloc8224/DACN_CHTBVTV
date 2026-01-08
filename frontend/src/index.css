@@ -2,35 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Inter', sans-serif;
+/* ===== RESET ===== */
+html,
+body,
+#root {
+  height: 100%;
   margin: 0;
   padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
   box-sizing: border-box;
 }
 
+/* ===== CHAT CONTENT ===== */
+.chat-message,
+.markdown-content {
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+/* ===== ANIMATION ===== */
 @keyframes bounce-slow {
   0%, 100% { transform: translateY(-5%); }
   50% { transform: translateY(5%); }
 }
+
 .animate-bounce-slow {
   animation: bounce-slow 4s infinite ease-in-out;
-}
-
-/* Đảm bảo nội dung chat không tràn khung */
-.markdown-content, .chat-message {
-  word-wrap: break-word;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-  text-align: left;
-  line-height: 1.5;
-}
-
-.markdown-content ul, .chat-message ul {
-  margin-left: 1rem;
-  list-style-type: disc;
-}
-
-.markdown-content p {
-  margin-bottom: 0.3rem;
 }

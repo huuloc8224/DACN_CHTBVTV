@@ -4,65 +4,73 @@ const cors = require('cors');
 const path = require('path');
 const { connectDB } = require('./config/db');
 
-// Models
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+/*   LOAD MODELS*/
 require('./models/User');
 require('./models/Product');
 require('./models/Order');
 require('./models/KnowledgeBase');
+require('./models/ChatSession'); // 👈 QUAN TRỌNG
 
-// Routes
-const authRoutes = require('./routes/authRoutes');
-const productRoutes = require('./routes/productRoutes');
-const orderRoutes = require('./routes/orderRoutes');
-const chatRoutes = require('./routes/chatRoutes');
-const userRoutes = require('./routes/userRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
-
-const app = express();
-const PORT = process.env.PORT || 3001;
-
-// Middlewares
+/* MIDDLEWARE*/
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
-// CORS
-const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5174'];
+/* CORS */
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5174'
+];
+
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
   },
-  credentials: true,
+  credentials: true
 }));
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/payment', paymentRoutes);
-app.use('/api/orders', orderRoutes);
-
-// Static files
+/*   STATIC FILES*/
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// Test route
+/* ROUTES*/
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/user', require('./routes/userRoutes')); 
+app.use('/api/products', require('./routes/productRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/cart', require('./routes/cartRoutes'));
+app.use('/api/payment', require('./routes/paymentRoutes'));
+
+app.use('/api/chat', require('./routes/chatRoutes'));
+
 app.get('/', (req, res) => {
-  res.send('<h1>Backend đang chạy ổn định!</h1>');
+  res.send('<h1>✅ Backend đang chạy ổn định!</h1>');
 });
 
-// Start server
+app.use((err, req, res, next) => {
+  console.error('❌ Unhandled error:', err);
+  if (res.headersSent) return next(err);
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Lỗi server nội bộ'
+  });
+});
+
 const startServer = async () => {
   try {
     await connectDB();
-    console.log('✅ Connected to MongoDB');
-    app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
-  } catch (error) {
-    console.error('❌ Lỗi kết nối DB:', error.message);
+    console.log('✅ MongoDB connected');
+
+    app.listen(PORT, () =>
+      console.log(`🚀 Server running at http://localhost:${PORT}`)
+    );
+  } catch (err) {
+    console.error('❌ DB connection failed:', err.message);
     process.exit(1);
   }
 };

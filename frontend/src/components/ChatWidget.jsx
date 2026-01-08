@@ -1,192 +1,203 @@
-// src/components/ChatWidget.jsx  ← DÁN ĐÈ TOÀN BỘ FILE NÀY (chỉ thay phần sendMessage + thêm 1 dòng state)
+// src/components/ChatWidget.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Loader2, Paperclip } from 'lucide-react';
+import axios from 'axios';
 
-const ChatWidget = () => {
+const ChatWidget = ({ crop = null }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      text: "Chào bà con! Bác Ba Lúa đây ạ! Hôm nay cây trồng có gì lạ không? Cứ gửi ảnh hoặc kể triệu chứng, bác tư vấn liền!",
-      sender: 'bot'
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const fileInputRef = useRef(null);
-  const messagesEndRef = useRef(null);
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
 
+  // Auto scroll xuống cuối khi có tin nhắn mới
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (isOpen) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isOpen]);
 
-  const toggleChat = () => setIsOpen(!isOpen);
-
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result);
-    reader.readAsDataURL(file);
-  };
-
-  // ←←← HÀM QUAN TRỌNG NHẤT: GỬI LỊCH SỬ CHAT CHO GEMINI
   const sendMessage = async () => {
-    if (!input.trim() && !imagePreview) return;
-    if (isLoading) return;
+    const text = input.trim();
+    if (!text || loading) return;
 
-    const userMessage = {
-      text: input || "Bà con gửi ảnh bệnh cây trồng",
-      sender: "user",
-      image: imagePreview || undefined
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput("");
-    setImagePreview(null);
-    setImageFile(null);
-    setIsLoading(true);
+    const userMsg = { role: 'user', text };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
 
     try {
-      // Chuẩn bị lịch sử theo đúng format Gemini cần
-      const historyForGemini = messages.map(msg => ({
-        role: msg.sender === "user" ? "user" : "model",
-        parts: msg.image
-          ? [
-              { text: msg.text || "Bà con gửi ảnh" },
-              { inline_data: { mime_type: "image/jpeg", data: msg.image.split(',')[1] } }
-            ]
-          : [{ text: msg.text }]
-      }));
-
-      // Tin nhắn hiện tại
-      const currentParts = [];
-      if (input.trim()) currentParts.push({ text: input });
-      if (imagePreview) {
-        currentParts.push({
-          inline_data: { mime_type: "image/jpeg", data: imagePreview.split(',')[1] }
-        });
-      }
-      historyForGemini.push({ role: "user", parts: currentParts });
-
-      const res = await fetch("http://localhost:3001/api/chat/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ history: historyForGemini })
+      const res = await axios.post('http://localhost:3001/api/chat/ask', {
+        message: text,
+        history: messages,
+        crop,
       });
 
-      if (!res.ok) throw new Error("Lỗi server");
-
-      const data = await res.json();
-      setMessages(prev => [...prev, { text: data.answer, sender: "bot" }]);
-
+      const botMsg = {
+        role: 'bot',
+        text: res.data.answer || 'Bác chưa nghe rõ, bà con nói lại nhé!',
+        source: res.data.source,
+      };
+      setMessages(prev => [...prev, botMsg]);
     } catch (err) {
-      setMessages(prev => [...prev, {
-        text: "Trời ơi mạng chậm quá, bà con gửi lại giúp bác nha!",
-        sender: "bot"
-      }]);
+      console.error('Chat error:', err);
+      const botMsg = {
+        role: 'bot',
+        text: 'Ôi trời, bác bị lỗi kỹ thuật rồi. Bà con thử lại chút nha! 🌾',
+        source: 'error',
+      };
+      setMessages(prev => [...prev, botMsg]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  // Giao diện chat (giữ nguyên như cũ)
-  return (
-    <>
-      {/* Nút mở chat */}
-      {!isOpen && (
-        <button
-          onClick={toggleChat}
-          className="fixed bottom-6 right-6 bg-green-600 text-white p-4 rounded-full shadow-lg hover:bg-green-700 transition z-50"
-        >
-          <MessageCircle size={32} />
-        </button>
-      )}
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
-      {/* Chat widget */}
-      {isOpen && (
-        <div className="fixed bottom-0 right-6 w-96 h-[600px] bg-white rounded-t-2xl shadow-2xl flex flex-col z-50 overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-green-600 font-bold text-xl">
-                BL
-              </div>
-              <div>
-                <h3 className="font-bold text-lg">Bác Ba Lúa - Chuyên gia AI</h3>
-                <p className="text-sm opacity-90">Luôn sẵn sàng giúp bà con</p>
+  // Nếu chưa mở → chỉ hiện nút bong bóng
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-6 right-6 z-50 w-16 h-16 bg-gradient-to-r from-emerald-600 to-green-700 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all duration-300 hover:shadow-3xl"
+        aria-label="Mở chat với Bác Ba Lúa"
+      >
+        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-2xl font-bold text-green-700 shadow-md">
+          BL
+        </div>
+        {/* Chấm xanh đang trực tuyến */}
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-lime-400 rounded-full border-4 border-white animate-pulse"></div>
+      </button>
+    );
+  }
+
+  // Khi mở → hiện full cửa sổ chat
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-end p-4 pointer-events-none">
+      {/* Overlay mờ (click để đóng - chỉ hiện trên mobile/tablet) */}
+      <div
+        className="absolute inset-0 bg-black/40 lg:hidden pointer-events-auto"
+        onClick={() => setIsOpen(false)}
+      />
+
+      {/* Cửa sổ chat chính */}
+      <div className="pointer-events-auto w-full max-w-md lg:max-w-lg h-[85vh] lg:h-[600px] bg-white rounded-3xl shadow-3xl overflow-hidden border border-gray-200 flex flex-col relative">
+        {/* Nút đóng (chỉ hiện trên mobile) */}
+        <button
+          onClick={() => setIsOpen(false)}
+          className="absolute top-4 right-4 z-10 w-10 h-10 bg-gray-200/80 hover:bg-gray-300 rounded-full flex items-center justify-center transition-all lg:hidden"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* Header */}
+        <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-5 flex items-center gap-4 shadow-md">
+          <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-green-700 font-bold text-xl shadow-md">
+            BL
+          </div>
+          <div>
+            <div className="font-bold text-lg">Bác Ba Lúa</div>
+            <div className="text-sm opacity-90">Trợ lý nông nghiệp • Đang trực tuyến</div>
+          </div>
+          {/* Nút đóng trên desktop */}
+          <button
+            onClick={() => setIsOpen(false)}
+            className="ml-auto hidden lg:block text-white/80 hover:text-white"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Danh sách tin nhắn */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50">
+          {messages.length === 0 && (
+            <div className="text-center text-gray-500 mt-8">
+              <div className="text-6xl mb-4">🌾</div>
+              <p className="text-lg font-medium">Chào bà con! Hỏi bác về cây trồng, sâu bệnh, phân bón nhé!</p>
+            </div>
+          )}
+
+          {messages.map((m, idx) => (
+            <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs lg:max-w-md px-5 py-3 rounded-3xl shadow-md ${
+                m.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-800 border border-gray-100'
+              }`}>
+                <p className="text-base whitespace-pre-wrap leading-relaxed">{m.text}</p>
+                {m.role === 'bot' && m.source && (
+                  <div className="text-xs text-gray-500 mt-3 pt-2 border-t border-gray-200">
+                    {m.source === 'gemini+kb' && '🧠 Kiến thức + AI'}
+                    {m.source === 'kb' && '📚 Kiến thức chuyên gia'}
+                    {m.source === 'gemini' && '🤖 AI thông minh'}
+                    {m.source === 'rule' && '🌾 Kinh nghiệm đồng áng'}
+                    {m.source === 'greeting' && '👋 Chào bà con'}
+                  </div>
+                )}
               </div>
             </div>
-            <button onClick={toggleChat} className="hover:bg-white/20 rounded-full p-2">
-              <X size={24} />
+          ))}
+
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-white px-5 py-3 rounded-3xl shadow-md border border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="flex space-x-2">
+                    <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce"></div>
+                    <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce delay-100"></div>
+                    <div className="w-3 h-3 bg-green-600 rounded-full animate-bounce delay-200"></div>
+                  </div>
+                  <span className="text-gray-600">Bác Ba Lúa đang suy nghĩ...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input */}
+        <div className="border-t border-gray-200 bg-white p-4">
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Có thắc mắc về sâu bệnh thì nhắn nhé...."
+              className="flex-1 px-5 py-3.5 bg-gray-100 rounded-full focus:outline-none focus:ring-4 focus:ring-green-500/30 focus:bg-white transition-all text-base placeholder-gray-500"
+              disabled={loading}
+              autoFocus
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading || !input.trim()}
+              className={`p-3.5 rounded-full transition-all shadow-lg ${
+                loading || !input.trim()
+                  ? 'bg-gray-300 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700 text-white hover:shadow-xl'
+              }`}
+            >
+              {loading ? (
+                <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
+              )}
             </button>
           </div>
-
-          {/* Tin nhắn */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-xs px-4 py-3 rounded-2xl ${
-                  msg.sender === "user" 
-                    ? "bg-green-600 text-white" 
-                    : "bg-white shadow-md text-gray-800"
-                }`}>
-                  {msg.image && <img src={msg.image} alt="Ảnh bệnh cây" className="w-full rounded-lg mb-2" />}
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-white shadow-md px-4 py-3 rounded-2xl">
-                  <p className="text-gray-600">Bác đang xem kỹ đây...</p>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="p-4 bg-white border-t">
-            {imagePreview && (
-              <div className="mb-3 relative inline-block">
-                <img src={imagePreview} alt="Preview" className="h-24 rounded-lg" />
-                <button
-                  onClick={() => { setImagePreview(null); setImageFile(null); }}
-                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <label className="cursor-pointer">
-                <Paperclip size={24} className="text-gray-500 hover:text-green-600" />
-                <input type="file" accept="image/*" onChange={handleImageSelect} ref={fileInputRef} className="hidden" />
-              </label>
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-                placeholder="Mô tả triệu chứng hoặc hỏi chuyện..."
-                className="flex-1 px-4 py-3 border rounded-full focus:outline-none focus:border-green-500"
-                disabled={isLoading}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={isLoading}
-                className="bg-green-600 text-white p-3 rounded-full hover:bg-green-700 disabled:opacity-50"
-              >
-                {isLoading ? <Loader2 className="animate-spin" size={24} /> : <Send size={24} />}
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 };
 

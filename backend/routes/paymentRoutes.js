@@ -16,7 +16,7 @@ const vnp_ReturnUrl = process.env.FRONTEND_URL
   ? `${process.env.FRONTEND_URL}/payment-success`
   : "http://localhost:5173/payment-success";
 
-// 1. TẠO URL THANH TOÁN VNPAY
+// TẠO URL THANH TOÁN VNPAY
 router.post('/create_payment_url', protect, async (req, res) => {
   try {
     const { orderId, amount } = req.body;
@@ -54,7 +54,7 @@ router.post('/create_payment_url', protect, async (req, res) => {
   }
 });
 
-// 2. NHẬN CALLBACK TỪ VNPAY (IPN) – TỰ ĐỘNG CẬP NHẬT TRẠNG THÁI
+//NHẬN CALLBACK TỪ VNPAY (IPN) – TỰ ĐỘNG CẬP NHẬT TRẠNG THÁI
 router.get('/vnpay_ipn', async (req, res) => {
   let vnp_Params = req.query;
   let secureHash = vnp_Params['vnp_SecureHash'];

@@ -4,15 +4,13 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const User = require('../models/User');
 
-/**
- * Helper: lấy userId an toàn từ req.user
- */
+
 const getRequesterId = (req) => {
   if (!req.user) return null;
   return req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : null);
 };
 
-// ==================== TẠO ĐƠN HÀNG ====================
+//TẠO ĐƠN HÀNG
 const createOrder = async (req, res) => {
   try {
     const requesterId = getRequesterId(req);
@@ -90,7 +88,7 @@ const createOrder = async (req, res) => {
   }
 };
 
-// ==================== LẤY ĐƠN HÀNG CỦA USER ====================
+//LẤY ĐƠN HÀNG CỦA USER
 const getMyOrders = async (req, res) => {
   try {
     const requesterId = getRequesterId(req);
@@ -114,7 +112,6 @@ const cancelOrder = async (req, res) => {
 
     if (order.status === 'Cancelled') return res.status(400).json({ message: 'Đơn đã bị hủy' });
 
-    // Hoàn trả tồn kho nếu cần (chỉ khi chưa giao)
     for (const it of order.orderItems) {
       if (it.product) {
         await Product.findByIdAndUpdate(it.product, { $inc: { stock_quantity: it.quantity } });
@@ -131,7 +128,7 @@ const cancelOrder = async (req, res) => {
   }
 };
 
-// ==================== LẤY CHI TIẾT ĐƠN HÀNG ====================
+//LẤY CHI TIẾT ĐƠN HÀNG
 const getOrderById = async (req, res) => {
   try {
     const requesterId = getRequesterId(req);
@@ -157,7 +154,7 @@ const getOrderById = async (req, res) => {
   }
 };
 
-// ==================== ADMIN: LẤY TẤT CẢ ĐƠN HÀNG ====================
+//ADMIN: LẤY TẤT CẢ ĐƠN HÀNG
 const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find({}).populate('userId', 'name email').sort({ createdAt: -1 });
@@ -168,7 +165,7 @@ const getAllOrders = async (req, res) => {
   }
 };
 
-// ==================== ADMIN: CẬP NHẬT TRẠNG THÁI ====================
+// ADMIN: CẬP NHẬT TRẠNG THÁI 
 const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -198,7 +195,7 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
-// ==================== XÓA ĐƠN HÀNG (ADMIN) ====================
+//XÓA ĐƠN HÀNG (ADMIN)
 const deleteOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -218,7 +215,7 @@ const deleteOrder = async (req, res) => {
   }
 };
 
-// ==================== THỐNG KÊ DOANH THU ====================
+// THỐNG KÊ DOANH THU
 const getSalesStatistics = async (req, res) => {
   try {
     const summaryAgg = [
@@ -272,7 +269,7 @@ const getSalesStatistics = async (req, res) => {
   }
 };
 
-// ==================== TOP KHÁCH HÀNG ====================
+//TOP KHÁCH HÀNG 
 const getTopCustomers = async (req, res) => {
   try {
     const minSpend = Number(req.query.minSpend || 0);
@@ -313,8 +310,7 @@ const getTopCustomers = async (req, res) => {
   }
 };
 
-// ==================== TOP SẢN PHẨM BÁN CHẠY (sửa để không gộp tất cả null-pid) ====================
-// controllers/orderController.js
+//TOP SẢN PHẨM BÁN CHẠY
 const getTopProducts = async (req, res) => {
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit || 10)));
@@ -331,7 +327,6 @@ const getTopProducts = async (req, res) => {
       { $match: matchStage },
       { $unwind: '$orderItems' },
 
-      // normalize pid: try product, productId, then orderItems._id (your case)
       { $addFields: {
           pid: {
             $ifNull: [
@@ -352,7 +347,6 @@ const getTopProducts = async (req, res) => {
         }
       },
 
-      // create grouping key: use pid when present, otherwise fallback to snapshot composite
       { $addFields: {
           keyGroup: {
             $cond: [
@@ -373,7 +367,6 @@ const getTopProducts = async (req, res) => {
         }
       },
 
-      // group by keyGroup
       { $group: {
           _id: '$keyGroup',
           totalQty: { $sum: '$itemQty' },
@@ -384,12 +377,10 @@ const getTopProducts = async (req, res) => {
         }
       },
 
-      // lookup product doc when pidSample exists
       { $addFields: { pidForLookup: { $cond: [{ $ne: ['$pidSample', null] }, '$pidSample', null] } } },
       { $lookup: { from: 'products', localField: 'pidForLookup', foreignField: '_id', as: 'productDoc' } },
       { $unwind: { path: '$productDoc', preserveNullAndEmptyArrays: true } },
 
-      // final projection with fallbacks
       { $project: {
           _id: 0,
           productId: { $cond: [{ $ne: ['$pidSample', null] }, '$pidSample', null] },
@@ -401,10 +392,7 @@ const getTopProducts = async (req, res) => {
         }
       },
 
-      // remove entries without a name
       { $match: { name: { $ne: null } } },
-
-      // sort and limit
       { $sort: by === 'revenue' ? { totalRevenue: -1 } : { totalQty: -1 } },
       { $limit: limit }
     ];
