@@ -11,7 +11,6 @@ const formatDate = (d) => {
   return isNaN(date.getTime()) ? 'Lỗi ngày' : date.toLocaleDateString('vi-VN');
 };
 
-// Bản dịch trạng thái sang tiếng Việt
 const STATUS_TRANSLATIONS = {
   Pending: 'Chờ xử lý',
   Shipped: 'Đang giao',
